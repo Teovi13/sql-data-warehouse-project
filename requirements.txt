@@ -1,0 +1,4 @@
+pandas>=3.0,<4
+sqlalchemy>=2.0,<3
+pyodbc>=5.0
+pytest>=8.0
