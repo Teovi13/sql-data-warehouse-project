@@ -1,0 +1,25 @@
+# OS-generated files
+Thumbs.db
+.DS_Store
+
+# SSMS / Visual Studio local config
+*.suo
+.vs/
+
+# SQL Server local backups
+*.bak
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Secretos y configuracion local
+.env
+!.env.example
+
+# Salidas generadas y pruebas sueltas
+logs/
+rejected/
+scratch/
