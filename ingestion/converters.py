@@ -10,16 +10,22 @@ import pandas as pd
 
 
 def convert_dates(values: pd.Series, date_format: str) -> pd.Series:
-    """Parse ``values`` with ``date_format``; null and invalid become NaT.
+    """Convert a text column to ``datetime64[us]``, strictly.
 
-    A date is valid only if formatting it back gives the original text. With
-    ``%Y-%m-%d``, impossible dates (``2023-02-30``) and loose formats
-    (``2023-1-5``) are therefore rejected.
+    A date is valid only if formatting it back with ``date_format`` gives
+    the original text, so impossible dates (``2023-02-30``) and loose
+    formats (``2023-1-5`` with ``%Y-%m-%d``) are rejected. Anything else
+    becomes ``NaT``; no exception is raised.
+
+    The result is always ``datetime64[us]``, even for a column with no
+    valid value, so its type does not depend on the data.
+
+    A failed conversion looks the same as an already missing value. To
+    find the failures, use ``values.notna() & converted.isna()``.
     """
-    parsed_dates = pd.to_datetime(
-        values, errors="coerce", format=date_format)
+    parsed_dates = pd.to_datetime(values, errors="coerce", format=date_format)
     round_trip = parsed_dates.dt.strftime(date_format)
-    return parsed_dates.where(round_trip == values)
+    return parsed_dates.where(round_trip == values).astype("datetime64[us]")
 
 
 def convert_integers(
