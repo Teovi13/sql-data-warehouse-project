@@ -9,6 +9,19 @@ being guessed.
 import pandas as pd
 
 
+def convert_dates(values: pd.Series, date_format: str) -> pd.Series:
+    """Parse ``values`` with ``date_format``; null and invalid become NaT.
+
+    A date is valid only if formatting it back gives the original text. With
+    ``%Y-%m-%d``, impossible dates (``2023-02-30``) and loose formats
+    (``2023-1-5``) are therefore rejected.
+    """
+    parsed_dates = pd.to_datetime(
+        values, errors="coerce", format=date_format)
+    round_trip = parsed_dates.dt.strftime(date_format)
+    return parsed_dates.where(round_trip == values)
+
+
 def convert_integers(
     values: pd.Series,
     minimum: int = -2**31,

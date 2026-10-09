@@ -8,18 +8,7 @@ expected to hold raw text. ``date_format`` is a ``strptime`` pattern such as
 
 import pandas as pd
 
-
-def _parse_dates(values: pd.Series, date_format: str) -> pd.Series:
-    """Parse ``values`` with ``date_format``; null and invalid become NaT.
-
-    A date is valid only if formatting it back gives the original text. With
-    ``%Y-%m-%d``, impossible dates (``2023-02-30``) and loose formats
-    (``2023-1-5``) are therefore rejected.
-    """
-    parsed_dates = pd.to_datetime(
-        values, errors="coerce", format=date_format)
-    round_trip = parsed_dates.dt.strftime(date_format)
-    return parsed_dates.where(round_trip == values)
+from ingestion.converters import convert_dates
 
 
 def find_nulls(df: pd.DataFrame, column: str) -> pd.DataFrame:
@@ -81,7 +70,7 @@ def find_invalid_dates(
     ``2023-1-5`` are flagged. Null values are ignored.
     """
     values = df[column]
-    parsed_dates = _parse_dates(values, date_format)
+    parsed_dates = convert_dates(values, date_format)
     has_value = values.notna()
     return df[has_value & parsed_dates.isna()]
 
@@ -143,7 +132,7 @@ def find_future_dates(
     """
     if as_of is None:
         as_of = pd.Timestamp.now()
-    parsed_dates = _parse_dates(df[column], date_format)
+    parsed_dates = convert_dates(df[column], date_format)
     return df[parsed_dates > as_of]
 
 
@@ -158,8 +147,8 @@ def find_date_order_violations(
     Equal dates are allowed. Rows with a null or invalid date in either
     column are ignored.
     """
-    earlier_parsed = _parse_dates(df[earlier], date_format)
-    later_parsed = _parse_dates(df[later], date_format)
+    earlier_parsed = convert_dates(df[earlier], date_format)
+    later_parsed = convert_dates(df[later], date_format)
     return df[earlier_parsed > later_parsed]
 
 
