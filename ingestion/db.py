@@ -17,43 +17,30 @@ from ingestion.config import BASE_DIR
 def get_engine() -> Engine:
     """Build a SQLAlchemy engine for the data warehouse.
 
-    Settings come from environment variables. The ``.env`` file at the
-    project root is loaded first; variables already set in the real
-    environment take precedence over it. Windows authentication is used,
-    so no username or password is needed.
+    Reads ``DW_SERVER`` and ``DW_DATABASE`` (required), plus
+    ``DW_ODBC_DRIVER`` and ``DW_TRUST_SERVER_CERT`` (optional), from the
+    environment. The ``.env`` file is loaded first, but variables already
+    set in the real environment win. See ``.env.example``. No username or
+    password is needed: Windows authentication is used.
 
-    Required variables:
-        DW_SERVER: SQL Server host and instance name.
-        DW_DATABASE: Database to connect to.
-
-    Optional variables:
-        DW_ODBC_DRIVER: ODBC driver name. Defaults to
-            ``ODBC Driver 18 for SQL Server``.
-        DW_TRUST_SERVER_CERT: ``yes`` or ``no``. Defaults to ``no``, so
-            the server certificate is validated unless validation is
-            explicitly disabled (development only).
-
-    Returns:
-        A lazy engine: no connection is opened until it is first used.
-        Each call creates a new engine with its own connection pool, so
-        call it once and share the result.
+    The engine is lazy and every call creates its own connection pool, so
+    call this once and share the result.
 
     Raises:
         KeyError: If ``DW_SERVER`` or ``DW_DATABASE`` is not set.
     """
-    # Load the project's .env file. Variables already present in the real
-    # environment are not overwritten.
     load_dotenv(BASE_DIR / ".env")
 
-    # Required settings: a missing one raises KeyError right away.
+    # Required: a missing variable fails here, not at connection time.
     server = os.environ["DW_SERVER"]
     database = os.environ["DW_DATABASE"]
 
-    # Optional settings, with safe defaults.
     odbc_driver = os.environ.get(
         "DW_ODBC_DRIVER",
         "ODBC Driver 18 for SQL Server",
     )
+    # Secure by default: the server certificate is validated unless the
+    # variable explicitly disables it (development only).
     trust_server_cert = os.environ.get("DW_TRUST_SERVER_CERT", "no")
 
     # No username or password: SQLAlchemy adds Trusted_Connection=Yes
@@ -72,21 +59,11 @@ def get_engine() -> Engine:
 
 
 def check_connection(engine: Engine) -> str:
-    """Check that the engine can reach the database.
-
-    Opens a connection, asks the server for the name of the database it
-    is connected to, and releases the connection.
-
-    Args:
-        engine: Engine returned by ``get_engine``.
-
-    Returns:
-        The name of the connected database, e.g. ``DataWarehouse``.
+    """Check that the engine can reach the database and return its name.
 
     Raises:
         sqlalchemy.exc.DBAPIError: If the connection cannot be established
-            or the query fails (driver, certificate, login or database
-            errors).
+            or the query fails.
     """
     # The connection goes back to the pool when the block ends.
     with engine.connect() as connection:
