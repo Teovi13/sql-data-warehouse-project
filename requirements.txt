@@ -1,4 +1,5 @@
 pandas>=3.0,<4
 sqlalchemy>=2.0,<3
-pyodbc>=5.0
+pyodbc>=5.0,<6
 pytest>=8.0
+python-dotenv>=1.0,<2
