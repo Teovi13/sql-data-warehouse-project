@@ -60,3 +60,34 @@ def convert_integers(
     valid_range = numbers.between(minimum, maximum)
     converted = numbers.where(valid_range).astype("Int64")
     return converted
+
+
+def convert_types(
+    df: pd.DataFrame,
+    integer_columns: list[str] | None = None,
+    date_columns: dict[str, str] | None = None,
+) -> pd.DataFrame:
+    """Convert the listed columns of a text table to their Bronze types.
+
+    Each column in ``integer_columns`` goes through ``convert_integers``,
+    and each ``column: format`` pair in ``date_columns`` goes through
+    ``convert_dates``. Other columns are left unchanged. The input is not
+    modified.
+
+    Conversion failures are not reported: a value that cannot be converted
+    becomes missing, as in those functions.
+
+    Raises:
+        KeyError: If a listed column is not in ``df``.
+    """
+    if integer_columns is None:
+        integer_columns = []
+    if date_columns is None:
+        date_columns = {}
+
+    converted = df.copy()
+    for column in integer_columns:
+        converted[column] = convert_integers(converted[column])
+    for column, date_format in date_columns.items():
+        converted[column] = convert_dates(converted[column], date_format)
+    return converted
