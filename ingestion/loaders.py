@@ -29,6 +29,30 @@ def check_row_count(table_name: str, expected: int, actual: int) -> None:
         )
 
 
+def load_and_log(engine: Engine, table_name: str, df: pd.DataFrame) -> None:
+    """Load a table with ``load_table`` and log the outcome.
+
+    A failed load is logged as ``STATUS_FAILED`` with the error type and
+    message. If writing the log also fails, that error is raised instead; a
+    successful load is already committed by then.
+
+    Raises:
+        Exception: Any error from ``load_table``, re-raised after logging it.
+    """
+    try:
+        load_table(engine, table_name, df)
+    except Exception as error:
+        write_load_log(
+            engine,
+            table_name,
+            STATUS_FAILED,
+            error_message=f"{type(error).__name__}: {error}",
+        )
+        raise
+    # Only reached on success: the except block always re-raises.
+    write_load_log(engine, table_name, STATUS_SUCCESS, rows_loaded=len(df))
+
+
 def load_table(engine: Engine, table_name: str, df: pd.DataFrame) -> None:
     """Replace the contents of a table with ``df`` in a single transaction.
 
