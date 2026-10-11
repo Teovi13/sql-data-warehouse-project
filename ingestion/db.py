@@ -24,7 +24,8 @@ def get_engine() -> Engine:
     password is needed: Windows authentication is used.
 
     The engine is lazy and every call creates its own connection pool, so
-    call this once and share the result.
+    call this once and share the result. Parameter values are hidden in
+    error messages and SQL logs.
 
     Raises:
         KeyError: If ``DW_SERVER`` or ``DW_DATABASE`` is not set.
@@ -54,7 +55,9 @@ def get_engine() -> Engine:
             "TrustServerCertificate": trust_server_cert,
         },
     )
-    engine = create_engine(url)
+    # Failed inserts would otherwise echo row values (customer data) into
+    # tracebacks and logs.
+    engine = create_engine(url, hide_parameters=True)
     return engine
 
 
