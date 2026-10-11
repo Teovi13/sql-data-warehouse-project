@@ -1,4 +1,4 @@
-"""Load typed DataFrames into the Bronze tables of the data warehouse."""
+"""Load typed DataFrames into Bronze tables and record the load outcomes."""
 
 import re
 
@@ -6,7 +6,10 @@ import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
+ERROR_MESSAGE_MAX_LENGTH = 2000  # matches bronze.load_log.error_message
 IDENTIFIER = r"[A-Za-z_][A-Za-z0-9_]*"
+STATUS_FAILED = "FAILED"
+STATUS_SUCCESS = "SUCCESS"
 TABLE_NAME_PATTERN = IDENTIFIER + r"\." + IDENTIFIER
 
 
@@ -55,3 +58,37 @@ def load_table(engine: Engine, table_name: str, df: pd.DataFrame) -> None:
         count_query = text(f"SELECT COUNT(*) FROM {table_name}")
         row_count = connection.execute(count_query).scalar_one()
         check_row_count(table_name, len(df), row_count)
+
+
+def write_load_log(
+    engine: Engine,
+    table_name: str,
+    status: str,
+    rows_loaded: int | None = None,
+    error_message: str | None = None,
+) -> None:
+    """Record the outcome of a load in ``bronze.load_log``.
+
+    The row is written in its own transaction, so it survives the rollback
+    of a failed load. ``status`` must be ``STATUS_SUCCESS`` or
+    ``STATUS_FAILED``; the database rejects anything else. ``error_message``
+    is cut to ``ERROR_MESSAGE_MAX_LENGTH`` characters.
+    """
+    # A message wider than the column would make this INSERT fail too.
+    if error_message is not None:
+        error_message = error_message[:ERROR_MESSAGE_MAX_LENGTH]
+    # Bound parameters: error messages contain quotes that break an f-string.
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO bronze.load_log "
+                "(table_name, status, rows_loaded, error_message) "
+                "VALUES (:table_name, :status, :rows_loaded, :error_message)"
+            ),
+            {
+                "table_name": table_name,
+                "status": status,
+                "rows_loaded": rows_loaded,
+                "error_message": error_message,
+            },
+        )
