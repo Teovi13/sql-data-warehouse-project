@@ -5,6 +5,16 @@ from ``ingestion.validators`` and its keyword arguments. The rules are run by
 ``ingestion.report.run_validations``.
 """
 
+from ingestion.config import (
+    COMPACT_DATE,
+    CRM_CUSTOMERS,
+    CRM_PRODUCTS,
+    CRM_SALES,
+    DASHED_DATE,
+    ERP_CATEGORIES,
+    ERP_CUSTOMERS,
+    ERP_LOCATIONS,
+)
 from ingestion.validators import (
     find_containing,
     find_date_order_violations,
@@ -19,16 +29,6 @@ from ingestion.validators import (
     find_total_mismatches,
     find_untrimmed,
 )
-
-CRM_CUSTOMERS = "bronze.crm_cust_info"
-CRM_PRODUCTS = "bronze.crm_prd_info"
-CRM_SALES = "bronze.crm_sales_details"
-ERP_CUSTOMERS = "bronze.erp_cust_az12"
-ERP_LOCATIONS = "bronze.erp_loc_a101"
-ERP_CATEGORIES = "bronze.erp_px_cat_g1v2"
-
-DASHED_DATE = "%Y-%m-%d"
-COMPACT_DATE = "%Y%m%d"
 
 RULES = [
     # crm_cust_info
