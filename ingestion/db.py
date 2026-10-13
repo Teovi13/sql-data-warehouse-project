@@ -26,6 +26,9 @@ def get_engine() -> Engine:
     The engine is lazy and every call creates its own connection pool, so
     call this once and share the result. Parameter values are hidden in
     error messages and SQL logs.
+    Inserts use pyodbc's ``fast_executemany``: the rows of an ``executemany``
+    call are sent in batches instead of one round trip per row. This needs
+    the Microsoft ODBC driver and SQLAlchemy 2.0.9 or later.
 
     Raises:
         KeyError: If ``DW_SERVER`` or ``DW_DATABASE`` is not set.
@@ -57,7 +60,10 @@ def get_engine() -> Engine:
     )
     # Failed inserts would otherwise echo row values (customer data) into
     # tracebacks and logs.
-    engine = create_engine(url, hide_parameters=True)
+    # Send the rows of each INSERT in batches instead of one by one.
+    engine = create_engine(
+        url, hide_parameters=True, fast_executemany=True
+    )
     return engine
 
 
