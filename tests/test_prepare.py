@@ -69,3 +69,52 @@ def test_unknown_table_fails_before_reading(monkeypatch):
     with pytest.raises(ValueError) as error:
         prepare.prepare_table("nope")
     assert "nope" in str(error.value)
+
+
+def test_find_column_problems_clean():
+    """A catalog that lists exactly the CSV columns has no problems."""
+    problems = prepare.find_column_problems(
+        ["id", "created", "name"], CATALOG[TABLE]
+    )
+    assert problems == {
+        "not_in_catalog": [],
+        "not_in_csv": [],
+        "repeated": [],
+    }
+
+
+def test_find_column_problems_typo():
+    """A typo is unknown to the catalog and leaves the real column absent."""
+    problems = prepare.find_column_problems(
+        ["id", "crated", "name"], CATALOG[TABLE]
+    )
+    assert problems == {
+        "not_in_catalog": ["crated"],
+        "not_in_csv": ["created"],
+        "repeated": [],
+    }
+
+
+def test_find_column_problems_repeated():
+    """A column listed twice in the catalog is reported."""
+    problems = prepare.find_column_problems(
+        ["id", "name"],
+        {"integer": ["id"], "date": {}, "text": ["id", "name"]}
+    )
+    assert problems == {
+        "not_in_catalog": [],
+        "not_in_csv": [],
+        "repeated": ["id"],
+    }
+
+
+def test_typo_in_csv_columns_raises(monkeypatch):
+    """A CSV column unknown to the catalog rejects the table."""
+    use_table(monkeypatch, {
+        "id": ["1"],
+        "crated": ["2006-06-05"],
+        "name": ["teo"]
+    })
+    with pytest.raises(ValueError) as error:
+        prepare.prepare_table(TABLE)
+    assert "'not_in_catalog': ['crated']" in str(error.value)
