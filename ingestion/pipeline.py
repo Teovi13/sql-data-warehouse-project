@@ -3,7 +3,13 @@
 import pandas as pd
 from sqlalchemy.engine import Engine
 
-from ingestion.loaders import STATUS_FAILED, load_and_log, write_load_log
+from ingestion.config import SOURCES
+from ingestion.loaders import (
+    STATUS_FAILED,
+    STATUS_SUCCESS,
+    load_and_log,
+    write_load_log,
+)
 from ingestion.prepare import prepare_table
 from ingestion.report import run_validations
 from ingestion.rules import RULES
@@ -64,3 +70,38 @@ def process_table(engine: Engine, table: str) -> pd.DataFrame:
         raise
     load_and_log(engine, table, typed)
     return report
+
+
+def ingest_all(engine: Engine) -> pd.DataFrame:
+    """Process every table in ``SOURCES`` and return a summary of the run.
+
+    A table that fails does not stop the others: its error is stored in the
+    summary and the next table is processed. The summary has one row per
+    table, in load order, with the columns ``table``, ``status``
+    (``STATUS_SUCCESS`` or ``STATUS_FAILED``), ``flagged`` (number of
+    validation rules that flagged rows, ``<NA>`` if the table failed) and
+    ``error`` (``"ErrorType: message"`` if the table failed).
+
+    The caller decides what a failed table means, for example exiting with
+    a non-zero code.
+    """
+    results = []
+    for table in SOURCES:
+        status = STATUS_SUCCESS
+        flagged = None
+        error = None
+        try:
+            report = process_table(engine, table)
+        except Exception as problem:  # pylint: disable=broad-exception-caught
+            status = STATUS_FAILED
+            error = f"{type(problem).__name__}: {problem}"
+        else:
+            flagged = (report["rows"] > 0).sum()
+        results.append({
+            "table": table,
+            "status": status,
+            "flagged": flagged,
+            "error": error,
+        })
+    columns = ["table", "status", "flagged", "error"]
+    return pd.DataFrame(results, columns=columns).astype({"flagged": "Int64"})
