@@ -13,6 +13,9 @@ Purpose:
 ===============================================================================
 */
 
+USE DataWarehouse;
+GO
+
 IF OBJECT_ID ('bronze.load_log', 'U') IS NULL
 	CREATE TABLE bronze.load_log (
 		load_id INT IDENTITY(1, 1),

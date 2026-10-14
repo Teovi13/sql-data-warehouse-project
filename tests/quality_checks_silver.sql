@@ -17,6 +17,9 @@ Usage Notes:
 ===============================================================================
 */
 
+USE DataWarehouse;
+GO
+
 -- ====================================================================
 -- Checking 'silver.crm_cust_info'
 -- ====================================================================
@@ -82,15 +85,16 @@ WHERE prd_end_dt < prd_start_dt;
 -- ====================================================================
 -- Checking 'silver.crm_sales_details'
 -- ====================================================================
--- Check for Invalid Dates
--- Expectation: No Invalid Dates
-SELECT 
-    NULLIF(sls_due_dt, 0) AS sls_due_dt 
-FROM bronze.crm_sales_details
-WHERE sls_due_dt <= 0 
-    OR LEN(sls_due_dt) != 8 
-    OR sls_due_dt > 20500101 
-    OR sls_due_dt < 19000101;
+-- Check for Invalid Dates (out of range)
+-- Expectation: No Results
+SELECT
+    sls_order_dt,
+    sls_ship_dt,
+    sls_due_dt
+FROM silver.crm_sales_details
+WHERE sls_order_dt NOT BETWEEN '1900-01-01' AND '2050-01-01'
+   OR sls_ship_dt  NOT BETWEEN '1900-01-01' AND '2050-01-01'
+   OR sls_due_dt   NOT BETWEEN '1900-01-01' AND '2050-01-01';
 
 -- Check for Invalid Date Orders (Order Date > Shipping/Due Dates)
 -- Expectation: No Results
