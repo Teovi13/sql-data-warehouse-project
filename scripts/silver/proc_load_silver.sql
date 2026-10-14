@@ -298,5 +298,7 @@ BEGIN
         PRINT 'Error Number: ' + CAST(ERROR_NUMBER() AS NVARCHAR);
         PRINT 'Error State: ' + CAST(ERROR_STATE() AS NVARCHAR);
         PRINT '=======================================';
+        -- Re-raise the original error so the caller knows the load failed.
+        THROW;
     END CATCH
 END
