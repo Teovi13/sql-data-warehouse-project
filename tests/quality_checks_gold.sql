@@ -16,6 +16,10 @@ Usage Notes:
 ===============================================================================
 */
 
+USE DataWarehouse;
+GO
+
+
 -- ============================================================================
 -- Checking 'gold.dim_customers'
 -- ============================================================================
@@ -24,6 +28,7 @@ Usage Notes:
 -- customer_key is generated with ROW_NUMBER(), so it should never repeat.
 -- A row here would indicate that the view's underlying JOINs are producing
 -- duplicate rows per customer (a "fan-out" caused by a bad join condition).
+
 SELECT
     customer_key,
     COUNT(*) AS duplicate_count

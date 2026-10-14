@@ -16,6 +16,10 @@ Usage Example:
     EXEC silver.load_silver;
 ===============================================================================
 */
+
+USE DataWarehouse;
+GO
+
 CREATE OR ALTER PROCEDURE silver.load_silver AS
 BEGIN
     DECLARE @start_time DATETIME, @end_time DATETIME, @batch_start_time DATETIME, @batch_end_time DATETIME;
@@ -56,8 +60,8 @@ BEGIN
             TRIM(cst_firstname) AS cst_firstname,
             TRIM(cst_lastname) AS cst_lastname,
             CASE
-                WHEN UPPER(TRIM(cst_marital_status)) = 'S' THEN 'Single'
-                WHEN UPPER(TRIM(cst_marital_status)) = 'M' THEN 'Married'
+                WHEN UPPER(TRIM(cst_marital_status)) IN ('S', 'SINGLE') THEN 'Single'
+                WHEN UPPER(TRIM(cst_marital_status)) IN ('M', 'MARRIED') THEN 'Married'
                 ELSE 'n/a'
             END AS cst_marital_status,
             CASE
@@ -102,7 +106,10 @@ BEGIN
             REPLACE(SUBSTRING(prd_key, 1, 5), '-', '_') AS cat_id,
             SUBSTRING(prd_key, 7, LEN(prd_key)) AS prd_key,
             prd_nm,
-            ISNULL(prd_cost, 0) AS prd_cost,
+            CASE
+                WHEN prd_cost IS NULL OR prd_cost < 0 THEN 0
+                ELSE prd_cost
+            END AS prd_cost,
             CASE UPPER(TRIM(prd_line))
                 WHEN 'M' THEN 'Mountain'
                 WHEN 'R' THEN 'Road'
@@ -266,7 +273,11 @@ BEGIN
             id,
             cat,
             subcat,
-            maintenance
+            CASE UPPER(TRIM(maintenance))
+                WHEN 'YES' THEN 'Yes'
+                WHEN 'NO' THEN 'No'
+                ELSE 'n/a'
+            END AS maintenance
         FROM bronze.erp_px_cat_g1v2;
 
         SET @end_time = GETDATE();
@@ -287,5 +298,7 @@ BEGIN
         PRINT 'Error Number: ' + CAST(ERROR_NUMBER() AS NVARCHAR);
         PRINT 'Error State: ' + CAST(ERROR_STATE() AS NVARCHAR);
         PRINT '=======================================';
+        -- Re-raise the original error so the caller knows the load failed.
+        THROW;
     END CATCH
 END

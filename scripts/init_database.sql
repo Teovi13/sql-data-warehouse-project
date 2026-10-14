@@ -14,7 +14,7 @@ GO
 --Delete and recreate the "DataWarehouse" database, hypothetically ensuring that no one was using it.
 IF EXISTS (SELECT 1 FROM sys.databases WHERE name = 'DataWarehouse')
 BEGIN 
-	ALTER DATABASE DataWarehouse SET SINGLE_USER ROLLBACK IMMEDIATE;
+	ALTER DATABASE DataWarehouse SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
 	DROP DATABASE DataWarehouse;
 END;
 GO
@@ -24,8 +24,9 @@ CREATE DATABASE DataWarehouse;
 GO
 
 USE DataWarehouse;
+GO
 
---Create the bronze-silver-gold scehmas
+--Create the bronze-silver-gold schemas
 CREATE SCHEMA bronze;
 GO
 

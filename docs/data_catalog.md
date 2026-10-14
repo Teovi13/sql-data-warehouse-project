@@ -35,8 +35,8 @@ retired product versions are filtered out — see note below).
 | `category_id` | `NVARCHAR(50)` | Foreign key to the category reference table, extracted from the first segment of `prd_key`. |
 | `category` | `NVARCHAR(50)` | High-level product category (e.g. `'Bikes'`, `'Components'`, `'Accessories'`), sourced from the ERP category reference table. |
 | `subcategory` | `NVARCHAR(50)` | More specific product grouping within a category. |
-| `maintenance` | `NVARCHAR(50)` | Indicates whether the product requires maintenance (e.g. `'Yes'` / `'No'`). |
-| `cost` | `INT` | Product's standard cost. `0` when the source value was `NULL` (cleaned in Silver). |
+| `maintenance` | `NVARCHAR(50)` | Indicates whether the product requires maintenance: `'Yes'`, `'No'`, or `'n/a'` when unknown. |
+| `cost` | `INT` | Product's standard cost. `0` when the source value was `NULL` or negative (cleaned in Silver). |
 | `product_line` | `NVARCHAR(50)` | Product line/family, standardized from a single-letter code: `'Mountain'`, `'Road'`, `'Other Sales'`, `'Touring'`, or `'n/a'`. |
 | `start_date` | `DATE` | Date this version of the product became effective/active. |
 
