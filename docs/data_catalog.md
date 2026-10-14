@@ -19,7 +19,7 @@ from the ERP system.
 | `customer_number` | `NVARCHAR(50)` | Business/natural key for the customer (`cst_key`). Used to match customers across CRM and ERP sources. |
 | `first_name` | `NVARCHAR(50)` | Customer's first name, trimmed of leading/trailing spaces. |
 | `last_name` | `NVARCHAR(50)` | Customer's last name, trimmed of leading/trailing spaces. |
-| `country` | `NVARCHAR(50)` | Customer's country of residence, standardized (e.g. `'DE'` → `'Germany'`, `'US'`/`'USA'` → `'United States'`). Value is `'n/a'` when unknown or missing. |
+| `country` | `NVARCHAR(50)` | Customer's country of residence, standardized (e.g. `'DE'` → `'Germany'`, `'US'`/`'USA'` → `'United States'`). Value is `'n/a'` when the country is empty in the ERP location table or the customer has no row there (the view uses `COALESCE`), so the column is never `NULL`. |
 | `marital_status` | `NVARCHAR(50)` | Customer's marital status, standardized from the CRM source: `'Single'`, `'Married'`, or `'n/a'` if not provided. |
 | `gender` | `NVARCHAR(50)` | Customer's gender. Prioritizes the CRM value (`cst_gndr`) when available; falls back to the ERP value (`gen`) when CRM reports `'n/a'`. Possible values: `'Male'`, `'Female'`, `'n/a'`. |
 | `birthdate` | `DATE` | Customer's date of birth, sourced from ERP. Can be `NULL` if not provided or if it was in the future in the source data (cleaned in Silver). |
