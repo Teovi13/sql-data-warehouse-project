@@ -87,7 +87,7 @@ def find_prefixed(
     if ignore_case:
         values = values.str.upper()
         prefix = prefix.upper()
-    starts_with_prefix = values.str.startswith(prefix)
+    starts_with_prefix = values.str.startswith(prefix).fillna(False)
     return df[starts_with_prefix]
 
 
@@ -103,7 +103,7 @@ def find_containing(
     if ignore_case:
         values = values.str.upper()
         text = text.upper()
-    contains_text = values.str.contains(text, regex=False)
+    contains_text = values.str.contains(text, regex=False).fillna(False)
     return df[contains_text]
 
 

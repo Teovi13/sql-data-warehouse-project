@@ -22,7 +22,7 @@ layers that progressively refine the data:
 | Layer | Purpose | Object type | Transformations |
 |---|---|---|---|
 | **Bronze** | Raw data, exactly as it arrives from the sources (CRM/ERP) | Tables | None (raw load with the [Python ingestion layer](#python-ingestion-layer) or `BULK INSERT`) |
-| **Silver** | Cleaned and standardized data | Tables | Cleansing, standardization, normalization, derived columns |
+| **Silver** | Cleaned and standardized data | Tables | Cleansing, standardization, derived columns, type casting |
 | **Gold** | Business-ready data, modeled as a star schema | Views | Integration, business logic |
 
 **End-to-end flow:** Sources (CSV) → Bronze → Silver → Gold → SQL Queries / BI
