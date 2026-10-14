@@ -8,6 +8,8 @@ Purpose:
     - Uniqueness of surrogate keys and of business keys in the dimension
       views.
     - Referential integrity between the fact view and its dimension views.
+    - That the dimension attributes promised as never NULL in the data
+      dictionary (country, gender, category) really are never NULL.
     - Grain of the fact view: one row per product within an order.
     - That the fact view has as many rows as its Silver source, so the
       joins did not duplicate or drop any sale.
@@ -61,6 +63,19 @@ FROM gold.dim_customers
 GROUP BY customer_number
 HAVING COUNT(*) > 1;
 
+-- Unknown values are 'n/a', never NULL (country and gender)
+-- Expectation: No results.
+-- A customer with no row in the ERP tables would get NULL from the LEFT JOIN
+-- instead of 'n/a', and a NULL becomes its own group in every GROUP BY.
+-- The view fills these gaps with COALESCE; a row here means that was lost.
+SELECT
+    customer_key,
+    country,
+    gender
+FROM gold.dim_customers
+WHERE country IS NULL
+   OR gender IS NULL;
+
 
 -- ============================================================================
 -- Checking 'gold.dim_products'
@@ -87,6 +102,18 @@ SELECT
 FROM gold.dim_products
 GROUP BY product_number
 HAVING COUNT(*) > 1;
+
+-- Every product has a category
+-- Expectation: No results.
+-- category and maintenance come from a LEFT JOIN to the ERP category table
+-- by category_id. A row here is a product whose category_id has no match
+-- there, so its category, subcategory and maintenance are NULL.
+SELECT
+    product_key,
+    product_number,
+    category_id
+FROM gold.dim_products
+WHERE category IS NULL;
 
 
 -- ============================================================================
