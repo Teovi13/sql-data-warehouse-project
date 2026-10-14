@@ -1,5 +1,7 @@
 """Tests for validate_table: flagged rows inform, crashed rules stop."""
 
+import logging
+
 import pandas as pd
 import pytest
 
@@ -51,3 +53,18 @@ def test_only_rules_of_the_table_run(monkeypatch):
     ]
     result = pipeline.validate_table(TABLE, rules)
     assert result["table"].tolist() == [TABLE]
+
+
+def test_log_flagged_rules_logs_only_rules_with_rows(caplog):
+    """A rule that flagged nothing is not worth a line in the log."""
+    report_frame = pd.DataFrame({
+        "rule": ["find_nulls", "find_duplicates"],
+        "params": [{"column": "id"}, {"column": "key"}],
+        "rows": [0, 3],
+    })
+    with caplog.at_level(logging.INFO, logger="ingestion.pipeline"):
+        pipeline.log_flagged_rules(TABLE, report_frame)
+    assert [record.levelname for record in caplog.records] == ["INFO"]
+    assert TABLE in caplog.messages[0]
+    assert "find_duplicates" in caplog.messages[0]
+    assert "3" in caplog.messages[0]

@@ -1,5 +1,7 @@
 """Run the ingestion of the Bronze tables: validate, prepare and load."""
 
+import logging
+
 import pandas as pd
 from sqlalchemy.engine import Engine
 
@@ -13,6 +15,8 @@ from ingestion.loaders import (
 from ingestion.prepare import prepare_table
 from ingestion.report import run_validations
 from ingestion.rules import RULES
+
+logger = logging.getLogger(__name__)
 
 
 def validate_table(table: str, rules: list) -> pd.DataFrame:
@@ -43,6 +47,21 @@ def validate_table(table: str, rules: list) -> pd.DataFrame:
     return report
 
 
+def log_flagged_rules(table: str, report: pd.DataFrame) -> None:
+    """Log one INFO line for each rule of ``report`` that flagged rows.
+
+    ``report`` is the one returned by ``validate_table``. Rules that flagged
+    no rows are skipped. Each line has the table, the rule with its
+    parameters and the number of rows it flagged.
+    """
+    flagged = report[report["rows"] > 0]
+    for row in flagged.itertuples():
+        logger.info(
+            "%s: %s(%s) flagged %d rows",
+            table, row.rule, row.params, row.rows,
+        )
+
+
 def process_table(engine: Engine, table: str) -> pd.DataFrame:
     """Validate, prepare and load one Bronze table.
 
@@ -68,6 +87,7 @@ def process_table(engine: Engine, table: str) -> pd.DataFrame:
             error_message=f"{type(error).__name__}: {error}",
         )
         raise
+    log_flagged_rules(table, report)
     load_and_log(engine, table, typed)
     return report
 
@@ -95,6 +115,7 @@ def ingest_all(engine: Engine) -> pd.DataFrame:
         except Exception as problem:  # pylint: disable=broad-exception-caught
             status = STATUS_FAILED
             error = f"{type(problem).__name__}: {problem}"
+            logger.exception("%s failed: %s", table, error)
         else:
             flagged = (report["rows"] > 0).sum()
         results.append({

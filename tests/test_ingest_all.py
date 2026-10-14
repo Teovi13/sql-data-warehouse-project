@@ -1,5 +1,7 @@
 """Tests for ingest_all: one failing table must not stop the others."""
 
+import logging
+
 import pandas as pd
 
 from ingestion import pipeline
@@ -63,3 +65,12 @@ def test_no_tables_gives_an_empty_summary(monkeypatch):
     summary = pipeline.ingest_all(ENGINE)
     assert summary.empty
     assert list(summary.columns) == COLUMNS
+
+
+def test_a_failing_table_is_logged_as_an_error(monkeypatch, caplog):
+    """The failure also goes to the log, with the name of the table."""
+    use_tables(monkeypatch, TABLES, failing=["t.b"])
+    with caplog.at_level(logging.ERROR, logger="ingestion.pipeline"):
+        pipeline.ingest_all(ENGINE)
+    assert [record.levelname for record in caplog.records] == ["ERROR"]
+    assert "t.b" in caplog.messages[0]

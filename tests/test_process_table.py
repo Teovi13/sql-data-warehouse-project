@@ -1,5 +1,7 @@
 """Tests for process_table: every failure is logged exactly once."""
 
+import logging
+
 import pandas as pd
 import pytest
 
@@ -70,3 +72,17 @@ def test_load_failure_is_not_logged_twice(monkeypatch):
         pipeline.process_table(ENGINE, TABLE)
     assert calls == ["validate", "prepare", "load"]
     assert not logged
+
+
+def test_flagged_rules_are_logged(monkeypatch, caplog):
+    """The rules that flagged rows show up in the log of the run."""
+    use_fakes(monkeypatch)
+    flagged = pd.DataFrame({
+        "rule": ["find_nulls"],
+        "params": [{"column": "id"}],
+        "rows": [2],
+    })
+    monkeypatch.setattr(pipeline, "validate_table", lambda *_args: flagged)
+    with caplog.at_level(logging.INFO, logger="ingestion.pipeline"):
+        pipeline.process_table(ENGINE, TABLE)
+    assert any("find_nulls" in message for message in caplog.messages)
