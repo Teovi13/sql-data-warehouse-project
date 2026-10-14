@@ -99,7 +99,7 @@ def test_find_column_problems_repeated():
     """A column listed twice in the catalog is reported."""
     problems = prepare.find_column_problems(
         ["id", "name"],
-        {"integer": ["id"], "date": {}, "text": ["id", "name"]}
+        {"integer": ["id"], "date": {}, "text": ["id", "name"], }
     )
     assert problems == {
         "not_in_catalog": [],
@@ -113,8 +113,23 @@ def test_typo_in_csv_columns_raises(monkeypatch):
     use_table(monkeypatch, {
         "id": ["1"],
         "crated": ["2006-06-05"],
-        "name": ["teo"]
+        "name": ["teo"],
     })
     with pytest.raises(ValueError) as error:
         prepare.prepare_table(TABLE)
     assert "'not_in_catalog': ['crated']" in str(error.value)
+
+
+def test_changed_row_count_raises(monkeypatch):
+    """A conversion that drops rows is rejected even if no null appears."""
+    use_table(monkeypatch, {
+        "id": ["1", "2"],
+        "created": ["2025-10-06", "2025-10-07"],
+        "name": ["a", "b"],
+    })
+    monkeypatch.setattr(
+        prepare, "convert_types", lambda df, **_kwargs: df.iloc[:1]
+    )
+    with pytest.raises(ValueError) as error:
+        prepare.prepare_table(TABLE)
+    assert "rows 2 -> 1" in str(error.value)
