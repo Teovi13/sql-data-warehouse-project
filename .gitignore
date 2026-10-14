@@ -15,11 +15,11 @@ __pycache__/
 .venv/
 .pytest_cache/
 
-# Secretos y configuracion local
+# Secrets and local configuration
 .env
 !.env.example
 
-# Salidas generadas y pruebas sueltas
+# Generated output and scratch experiments
 logs/
 rejected/
 scratch/
