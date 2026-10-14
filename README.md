@@ -23,9 +23,12 @@ layers that progressively refine the data:
 |---|---|---|---|
 | **Bronze** | Raw data, exactly as it arrives from the sources (CRM/ERP) | Tables | None (raw load with the [Python ingestion layer](#python-ingestion-layer) or `BULK INSERT`) |
 | **Silver** | Cleaned and standardized data | Tables | Cleansing, standardization, normalization, derived columns |
-| **Gold** | Business-ready data, modeled as a star schema | Views | Integration, aggregations, business logic |
+| **Gold** | Business-ready data, modeled as a star schema | Views | Integration, business logic |
 
 **End-to-end flow:** Sources (CSV) → Bronze → Silver → Gold → SQL Queries / BI
+
+The SQL analysis built on top of the Gold layer lives in a separate repository:
+[sql-data-analysis-project](https://github.com/Teovi13/sql-data-analysis-project).
 
 More diagrams available in [`docs/`](docs/):
 - [`data_flow.png`](docs/data_flow.png) — data flow between tables across layers
@@ -320,6 +323,20 @@ checked and recorded. For each of the six Bronze tables it:
    transaction, checks the row count, and rolls everything back on any error.
 4. **Logs** the outcome of the attempt (status, rows loaded, error message)
    in `bronze.load_log`.
+
+This is the flow for each table. The six tables are processed one after the
+other, and every attempt leaves exactly one row in `bronze.load_log`:
+
+```mermaid
+flowchart TB
+    csv[("CSV file<br>in datasets/")] --> validate["1. Validate<br>quality rules,<br>they only report"]
+    validate --> prepare["2. Prepare<br>text to INT and DATE,<br>strict conversion"]
+    prepare --> load["3. Load<br>one transaction:<br>TRUNCATE, INSERT,<br>row count check"]
+    load --> ok[("4. bronze.load_log<br>SUCCESS and rows loaded")]
+    validate -. "no rules, or a rule could not run" .-> failed[("4. bronze.load_log<br>FAILED and the error")]
+    prepare -. "a value would be lost" .-> failed
+    load -. "any error: rollback" .-> failed
+```
 
 A table that fails does not stop the others. The Silver and Gold layers are
 not touched: after the Python load, continue with step 3 of
