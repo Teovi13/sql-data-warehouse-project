@@ -105,7 +105,9 @@ WHERE sls_order_dt > sls_ship_dt
    OR sls_order_dt > sls_due_dt;
 
 -- Check Data Consistency: Sales = Quantity * Price
--- Expectation: No Results
+-- Expectation: No Results, except for sales whose 'sales' and 'price' are
+-- both missing in the source: they cannot be reconstructed (2 rows with the
+-- included dataset).
 SELECT DISTINCT 
     sls_sales,
     sls_quantity,

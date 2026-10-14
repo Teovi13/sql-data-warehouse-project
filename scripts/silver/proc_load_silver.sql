@@ -106,7 +106,10 @@ BEGIN
             REPLACE(SUBSTRING(prd_key, 1, 5), '-', '_') AS cat_id,
             SUBSTRING(prd_key, 7, LEN(prd_key)) AS prd_key,
             prd_nm,
-            ISNULL(prd_cost, 0) AS prd_cost,
+            CASE
+                WHEN prd_cost IS NULL OR prd_cost < 0 THEN 0
+                ELSE prd_cost
+            END AS prd_cost,
             CASE UPPER(TRIM(prd_line))
                 WHEN 'M' THEN 'Mountain'
                 WHEN 'R' THEN 'Road'
@@ -270,7 +273,11 @@ BEGIN
             id,
             cat,
             subcat,
-            maintenance
+            CASE UPPER(TRIM(maintenance))
+                WHEN 'YES' THEN 'Yes'
+                WHEN 'NO' THEN 'No'
+                ELSE 'n/a'
+            END AS maintenance
         FROM bronze.erp_px_cat_g1v2;
 
         SET @end_time = GETDATE();
