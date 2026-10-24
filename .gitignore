@@ -13,6 +13,7 @@ Thumbs.db
 __pycache__/
 *.py[cod]
 .venv/
+.venv-dbt/
 .pytest_cache/
 
 # Secrets and local configuration
