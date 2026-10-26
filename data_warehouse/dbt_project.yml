@@ -21,3 +21,10 @@ snapshot-paths: ["snapshots"]
 clean-targets:         # directories to be removed by `dbt clean`
   - "target"
   - "dbt_packages"
+
+models:
+  data_warehouse:
+    silver:
+      +materialized: table
+      +schema: silver
+      +as_columnstore: false
