@@ -28,3 +28,6 @@ models:
       +materialized: table
       +schema: silver
       +as_columnstore: false
+    gold:
+      +materialized: view
+      +schema: gold
