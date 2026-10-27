@@ -23,9 +23,10 @@ final as (
                 else cid
             end
         as nvarchar(50)) as cid,
-        -- Depends on the run date: a birthdate after today becomes NULL
+        -- A birthdate after the reference date (var reference_date, default:
+        -- the run start date) becomes NULL
         case
-            when bdate > getdate() then null
+            when bdate > cast('{{ var("reference_date") }}' as date) then null
             else bdate
         end as bdate,
         cast(

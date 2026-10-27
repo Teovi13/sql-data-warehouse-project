@@ -52,7 +52,9 @@ final as (
         sls_due_dt,
         sls_sales,
         sls_quantity,
-        -- Derived from the corrected sales; integer division, as in the old procedure
+        -- Derived from the corrected sales; integer division, as in the old
+        -- procedure. A non-exact division would leave sales != quantity * price
+        -- and fail assert_crm_sales_details_amounts_consistent
         case
             when sls_price is null or sls_price <= 0
                 then sls_sales / nullif(sls_quantity, 0)

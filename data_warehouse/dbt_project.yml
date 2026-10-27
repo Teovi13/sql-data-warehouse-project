@@ -36,3 +36,6 @@ data_tests:
   data_warehouse:
     +store_failures: true
     +as_columnstore: false
+
+vars:
+  reference_date: "{{ run_started_at.strftime('%Y-%m-%d') }}"
