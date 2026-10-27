@@ -37,7 +37,7 @@ final as (
     left join erp_px_cat_g1v2 as pc
         on pn.cat_id = pc.id
     -- Current version only: older versions have an end date
-    where prd_end_dt is null
+    where pn.prd_end_dt is null
 )
 
 select * from final

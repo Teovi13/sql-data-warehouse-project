@@ -31,3 +31,8 @@ models:
     gold:
       +materialized: view
       +schema: gold
+
+data_tests:
+  data_warehouse:
+    +store_failures: true
+    +as_columnstore: false

@@ -1,0 +1,83 @@
+# =============================================================================
+# Models: Silver layer
+# =============================================================================
+# Purpose:
+#     Generic data tests for the Silver models: primary keys, the keys used
+#     by the Gold joins, and the domains of the decoded columns.
+# =============================================================================
+
+models:
+  - name: crm_cust_info
+    columns:
+      - name: cst_id
+        data_tests:
+          - unique
+          - not_null
+      - name: cst_key
+        data_tests:
+          - unique
+          - not_null
+      - name: cst_marital_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Married', 'Single', 'n/a']
+      - name: cst_gndr
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Female', 'Male', 'n/a']
+
+
+  - name: crm_prd_info
+    columns:
+      - name: prd_id
+        data_tests:
+          - unique
+          - not_null
+      - name: prd_cost
+        data_tests:
+          - not_null
+      - name: prd_line
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Mountain', 'Other Sales', 'Road', 'Touring', 'n/a']
+
+  - name: erp_cust_az12
+    columns:
+      - name: cid
+        data_tests:
+          - unique
+          - not_null
+      - name: gen
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Female', 'Male', 'n/a']
+
+  - name: erp_loc_a101
+    columns:
+      - name: cid
+        data_tests:
+          - unique
+          - not_null
+      - name: cntry
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Australia', 'France', 'Germany', 'Spain', 'United States', 'n/a']
+              config:
+                severity: warn
+
+  - name: erp_px_cat_g1v2
+    columns:
+      - name: id
+        data_tests:
+          - unique
+          - not_null
+      - name: maintenance
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['No', 'Yes', 'n/a']
