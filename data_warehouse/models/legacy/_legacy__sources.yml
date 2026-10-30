@@ -1,0 +1,34 @@
+# =============================================================================
+# Sources: legacy Silver and Gold
+# =============================================================================
+# Purpose:
+#     The Silver tables and Gold views built by the old T-SQL procedures and
+#     DDL scripts. dbt does not build them: they are declared only so the
+#     parity tests can compare each dbt model with its legacy counterpart.
+#     Remove this file, and the parity tests, at the cutover.
+# =============================================================================
+
+sources:
+  - name: legacy_silver
+    description: "Silver tables loaded by the legacy procedure silver.load_silver."
+    database: DataWarehouse
+    schema: silver
+    loader: legacy T-SQL scripts
+    tables:
+      - name: crm_cust_info
+      - name: crm_prd_info
+      - name: crm_sales_details
+      - name: erp_cust_az12
+      - name: erp_loc_a101
+      - name: erp_px_cat_g1v2
+
+
+  - name: legacy_gold
+    description: "Gold views created by the legacy script scripts/gold/ddl_gold.sql."
+    database: DataWarehouse
+    schema: gold
+    loader: legacy T-SQL scripts
+    tables:
+      - name: dim_customers
+      - name: dim_products
+      - name: fact_sales

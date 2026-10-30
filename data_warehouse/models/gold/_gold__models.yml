@@ -10,6 +10,10 @@
 
 models:
   - name: dim_customers
+    data_tests:
+      - parity_with:
+          arguments:
+            legacy: source('legacy_gold', 'dim_customers')
     columns:
       - name: customer_key
         data_tests:
@@ -31,6 +35,10 @@ models:
           - not_null
 
   - name: dim_products
+    data_tests:
+      - parity_with:
+          arguments:
+            legacy: source('legacy_gold', 'dim_products')
     columns:
       - name: product_key
         data_tests:
@@ -45,6 +53,10 @@ models:
           - not_null
 
   - name: fact_sales
+    data_tests:
+      - parity_with:
+          arguments:
+            legacy: source('legacy_gold', 'fact_sales')
     columns:
       - name: customer_key
         data_tests:
