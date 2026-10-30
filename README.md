@@ -248,8 +248,10 @@ through already-clean data:
 | `NAS`-prefixed and dash-formatted customer IDs | ERP files | Stripped/normalized to match the CRM business key |
 
 Only one of these defects survives Silver, because there is nothing to rebuild
-it from: the sales with neither `sales` nor `price`. They are the 2 rows that
-the sales consistency check of `tests/quality_checks_silver.sql` reports.
+it from: the sales with neither `sales` nor `price`. They are three sales;
+the sales consistency check of `tests/quality_checks_silver.sql` shows them
+as 2 rows because two of them have the same values and the check uses
+`SELECT DISTINCT`.
 
 ---
 
@@ -282,6 +284,8 @@ sql-data-warehouse-project/
 │
 ├── ingestion/                 # Python ingestion layer, with its own README
 │
+├── data_warehouse/            # dbt project for Silver and Gold (in progress), with its own README
+│
 ├── tests/                     # Data quality checks (SQL) and unit tests (pytest)
 │   ├── quality_checks_silver.sql
 │   ├── quality_checks_gold.sql
@@ -300,6 +304,7 @@ sql-data-warehouse-project/
 ├── pytest.ini
 ├── requirements.txt           # Dependencies to run the Python layer
 ├── requirements-dev.txt       # The same plus tests and code style tools
+├── requirements-dbt.txt       # dbt Core and the SQL Server adapter (separate virtual environment)
 ├── LICENSE
 └── README.md
 ```
@@ -429,6 +434,18 @@ ORDER BY table_name;
 
 For developers: the tests, the modules, the design decisions and the known
 limitations of the layer are in [`ingestion/README.md`](ingestion/README.md).
+
+---
+
+## dbt transformation layer (in progress)
+
+The Silver and Gold layers are being migrated to a [dbt](https://docs.getdbt.com/)
+project in [`data_warehouse/`](data_warehouse/): one `SELECT` per model, built
+in dependency order, with 54 data tests and a parity test that compares every
+dbt model with its T-SQL counterpart on each build. During the migration dbt
+builds into its own schemas (`dbt_dev_silver`, `dbt_dev_gold`), and the T-SQL
+scripts above remain the official way to build Silver and Gold. Setup and
+details in [`data_warehouse/README.md`](data_warehouse/README.md).
 
 ---
 
