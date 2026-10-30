@@ -1,0 +1,74 @@
+# =============================================================================
+# Models: Gold layer
+# =============================================================================
+# Purpose:
+#     Generic data tests for the star schema: unique surrogate and business
+#     keys in the dimensions, attributes that must never be NULL, and the
+#     foreign keys of the fact table (not_null + relationships, because
+#     relationships alone skips NULL keys).
+# =============================================================================
+
+models:
+  - name: dim_customers
+    data_tests:
+      - parity_with:
+          arguments:
+            legacy: source('legacy_gold', 'dim_customers')
+    columns:
+      - name: customer_key
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_id
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_number
+        data_tests:
+          - unique
+          - not_null
+      - name: country
+        data_tests:
+          - not_null
+      - name: gender
+        data_tests:
+          - not_null
+
+  - name: dim_products
+    data_tests:
+      - parity_with:
+          arguments:
+            legacy: source('legacy_gold', 'dim_products')
+    columns:
+      - name: product_key
+        data_tests:
+          - unique
+          - not_null
+      - name: product_number
+        data_tests:
+          - unique
+          - not_null
+      - name: category
+        data_tests:
+          - not_null
+
+  - name: fact_sales
+    data_tests:
+      - parity_with:
+          arguments:
+            legacy: source('legacy_gold', 'fact_sales')
+    columns:
+      - name: customer_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_key
+      - name: product_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_key

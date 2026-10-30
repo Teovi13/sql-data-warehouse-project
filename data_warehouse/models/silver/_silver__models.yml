@@ -1,0 +1,116 @@
+# =============================================================================
+# Models: Silver layer
+# =============================================================================
+# Purpose:
+#     Generic data tests for the Silver models: parity with the legacy Silver
+#     tables, primary keys, the keys used by the Gold joins, and the domains
+#     of the decoded columns. The business rules of crm_sales_details are
+#     singular tests in tests/silver/.
+# =============================================================================
+
+models:
+  - name: crm_cust_info
+    data_tests:
+      - parity_with:
+          arguments:
+            legacy: source('legacy_silver', 'crm_cust_info')
+            exclude_columns: ['dwh_create_date']
+    columns:
+      - name: cst_id
+        data_tests:
+          - unique
+          - not_null
+      - name: cst_key
+        data_tests:
+          - unique
+          - not_null
+      - name: cst_marital_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Married', 'Single', 'n/a']
+      - name: cst_gndr
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Female', 'Male', 'n/a']
+
+  - name: crm_prd_info
+    data_tests:
+      - parity_with:
+          arguments:
+            legacy: source('legacy_silver', 'crm_prd_info')
+            exclude_columns: ['dwh_create_date']
+    columns:
+      - name: prd_id
+        data_tests:
+          - unique
+          - not_null
+      - name: prd_cost
+        data_tests:
+          - not_null
+      - name: prd_line
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Mountain', 'Other Sales', 'Road', 'Touring', 'n/a']
+
+  - name: crm_sales_details
+    data_tests:
+      - parity_with:
+          arguments:
+            legacy: source('legacy_silver', 'crm_sales_details')
+            exclude_columns: ['dwh_create_date']
+
+  - name: erp_cust_az12
+    data_tests:
+      - parity_with:
+          arguments:
+            legacy: source('legacy_silver', 'erp_cust_az12')
+            exclude_columns: ['dwh_create_date']
+    columns:
+      - name: cid
+        data_tests:
+          - unique
+          - not_null
+      - name: gen
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Female', 'Male', 'n/a']
+
+  - name: erp_loc_a101
+    data_tests:
+      - parity_with:
+          arguments:
+            legacy: source('legacy_silver', 'erp_loc_a101')
+            exclude_columns: ['dwh_create_date']
+    columns:
+      - name: cid
+        data_tests:
+          - unique
+          - not_null
+      - name: cntry
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Australia', 'France', 'Germany', 'Spain', 'United States', 'n/a']
+              config:
+                severity: warn
+
+  - name: erp_px_cat_g1v2
+    data_tests:
+      - parity_with:
+          arguments:
+            legacy: source('legacy_silver', 'erp_px_cat_g1v2')
+            exclude_columns: ['dwh_create_date']
+    columns:
+      - name: id
+        data_tests:
+          - unique
+          - not_null
+      - name: maintenance
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['No', 'Yes', 'n/a']

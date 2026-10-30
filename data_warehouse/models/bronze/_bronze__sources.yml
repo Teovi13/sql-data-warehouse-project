@@ -1,0 +1,28 @@
+# =============================================================================
+# Sources: Bronze layer
+# =============================================================================
+# Purpose:
+#     Declares the Bronze tables as dbt sources. dbt never builds them: they
+#     are loaded by the Python ingestion layer (python -m ingestion.main).
+#     Silver models read Bronze only through source(), never by table name.
+# =============================================================================
+
+sources:
+  - name: bronze
+    description: "Faithful copies of the CRM and ERP source files (CSV). Types are validated on load, but no cleansing is applied: that happens in Silver."
+    database: DataWarehouse
+    schema: bronze
+    loader: python ingestion layer (ingestion/)
+    tables:
+      - name: crm_cust_info
+        description: "CRM customer master data: names, marital status, gender and creation date. The same customer can appear more than once (older and newer versions of the record)."
+      - name: crm_prd_info
+        description: "CRM product data: one row per product version, with cost, product line and validity start date. The product key embeds the category ID."
+      - name: crm_sales_details
+        description: "CRM sales transactions: one row per product within an order. Order and ship dates are stored as yyyymmdd integers."
+      - name: erp_cust_az12
+        description: "ERP customer demographics: birthdate and gender by customer ID. Some IDs carry a 'NAS' prefix."
+      - name: erp_loc_a101
+        description: "ERP customer location: country by customer ID. Some IDs contain a dash."
+      - name: erp_px_cat_g1v2
+        description: "ERP product category reference: category, subcategory and maintenance flag by category ID."
