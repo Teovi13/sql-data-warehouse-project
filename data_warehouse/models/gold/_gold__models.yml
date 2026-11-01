@@ -2,10 +2,13 @@
 # Models: Gold layer
 # =============================================================================
 # Purpose:
-#     Generic data tests for the star schema: unique surrogate and business
-#     keys in the dimensions, attributes that must never be NULL, and the
-#     foreign keys of the fact table (not_null + relationships, because
-#     relationships alone skips NULL keys).
+#     Generic data tests for the star schema: parity with the legacy Gold
+#     views (surrogate keys excluded: they are hashes in dbt, ROW_NUMBER
+#     values in the legacy views; tests/gold checks that they still resolve
+#     to the same customers and products), unique surrogate and business
+#     keys in the dimensions, attributes that must never be NULL, the grain
+#     of the fact table, and its foreign keys (not_null + relationships,
+#     because relationships alone skips NULL keys).
 # =============================================================================
 
 models:
@@ -14,6 +17,7 @@ models:
       - parity_with:
           arguments:
             legacy: source('legacy_gold', 'dim_customers')
+            exclude_columns: ['customer_key']
     columns:
       - name: customer_key
         data_tests:
@@ -39,6 +43,7 @@ models:
       - parity_with:
           arguments:
             legacy: source('legacy_gold', 'dim_products')
+            exclude_columns: ['product_key']
     columns:
       - name: product_key
         data_tests:
@@ -57,6 +62,7 @@ models:
       - parity_with:
           arguments:
             legacy: source('legacy_gold', 'fact_sales')
+            exclude_columns: ['customer_key', 'product_key']
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: ['order_number', 'product_key']

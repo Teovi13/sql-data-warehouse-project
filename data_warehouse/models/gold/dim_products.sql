@@ -20,9 +20,9 @@ erp_px_cat_g1v2 as (
 
 final as (
     select
-        -- Surrogate key from the product ID order: it shifts if a product
-        -- with a lower ID is added
-        row_number() over (order by pn.prd_id) as product_key,
+        -- Surrogate key: hash of the business key (product number), so it
+        -- never changes when other products are added or removed
+        {{ dbt_utils.generate_surrogate_key(['pn.prd_key']) }} as product_key,
         pn.prd_id as product_id,
         pn.prd_key as product_number,
         pn.prd_nm as product_name,
