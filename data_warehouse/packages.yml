@@ -1,0 +1,14 @@
+# =============================================================================
+# Packages
+# =============================================================================
+# Purpose:
+#     dbt packages used by the project. dbt_utils provides surrogate key
+#     generation and extra generic tests. Check every macro on SQL Server
+#     (dbt compile) before using it: some dbt_utils defaults are not T-SQL.
+#     tsql_utils is not used: its overrides target the Fabric adapter, which
+#     dbt-sqlserver 1.12 no longer builds on.
+# =============================================================================
+
+packages:
+  - package: dbt-labs/dbt_utils
+    version: [">=1.4.0", "<2.0.0"]
