@@ -441,7 +441,7 @@ limitations of the layer are in [`ingestion/README.md`](ingestion/README.md).
 
 The Silver and Gold layers are being migrated to a [dbt](https://docs.getdbt.com/)
 project in [`data_warehouse/`](data_warehouse/): one `SELECT` per model, built
-in dependency order, with 54 data tests and a parity test that compares every
+in dependency order, with 61 data tests and a parity test that compares every
 dbt model with its T-SQL counterpart on each build. During the migration dbt
 builds into its own schemas (`dbt_dev_silver`, `dbt_dev_gold`), and the T-SQL
 scripts above remain the official way to build Silver and Gold. Setup and

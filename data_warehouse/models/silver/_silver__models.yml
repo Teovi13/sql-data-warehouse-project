@@ -3,9 +3,9 @@
 # =============================================================================
 # Purpose:
 #     Generic data tests for the Silver models: parity with the legacy Silver
-#     tables, primary keys, the keys used by the Gold joins, and the domains
-#     of the decoded columns. The business rules of crm_sales_details are
-#     singular tests in tests/silver/.
+#     tables, primary keys, the keys used by the Gold joins, untrimmed text,
+#     and the domains of the decoded columns. The business rules of
+#     crm_sales_details are singular tests in tests/silver/.
 # =============================================================================
 
 models:
@@ -24,6 +24,13 @@ models:
         data_tests:
           - unique
           - not_null
+          - no_untrimmed_values
+      - name: cst_firstname
+        data_tests:
+          - no_untrimmed_values
+      - name: cst_lastname
+        data_tests:
+          - no_untrimmed_values
       - name: cst_marital_status
         data_tests:
           - accepted_values:
@@ -54,6 +61,9 @@ models:
           - accepted_values:
               arguments:
                 values: ['Mountain', 'Other Sales', 'Road', 'Touring', 'n/a']
+      - name: prd_nm
+        data_tests:
+          - no_untrimmed_values
 
   - name: crm_sales_details
     data_tests:
@@ -114,3 +124,9 @@ models:
           - accepted_values:
               arguments:
                 values: ['No', 'Yes', 'n/a']
+      - name: cat
+        data_tests:
+          - no_untrimmed_values
+      - name: subcat
+        data_tests:
+          - no_untrimmed_values

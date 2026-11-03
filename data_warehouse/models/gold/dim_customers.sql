@@ -24,9 +24,9 @@ erp_loc_a101 as (
 
 final as (
     select
-        -- Surrogate key from the customer ID order: it shifts if a customer
-        -- with a lower ID is added
-        row_number() over (order by ci.cst_id) as customer_key,
+        -- Surrogate key: hash of the business key (CRM customer ID), so it
+        -- never changes when other customers are added or removed
+        {{ dbt_utils.generate_surrogate_key(['ci.cst_id']) }} as customer_key,
         ci.cst_id as customer_id,
         ci.cst_key as customer_number,
         ci.cst_firstname as first_name,
