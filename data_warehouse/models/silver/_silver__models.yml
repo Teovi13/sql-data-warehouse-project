@@ -3,9 +3,9 @@
 # =============================================================================
 # Purpose:
 #     Generic data tests for the Silver models: parity with the legacy Silver
-#     tables, primary keys, the keys used by the Gold joins, untrimmed text, and the domains
-#     of the decoded columns. The business rules of crm_sales_details are
-#     singular tests in tests/silver/.
+#     tables, primary keys, the keys used by the Gold joins, untrimmed text,
+#     and the domains of the decoded columns. The business rules of
+#     crm_sales_details are singular tests in tests/silver/.
 # =============================================================================
 
 models:

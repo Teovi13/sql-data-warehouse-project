@@ -43,7 +43,7 @@
     {%- for row in tables_result.rows -%}
         {%- set schema = row['table_schema'] | lower -%}
         {%- set full_name = (row['table_schema'] ~ '.' ~ row['table_name']) | lower -%}
-        {%- if (schema == target.schema | lower or schema.startswith(target.schema | lower  ~ '_'))
+        {%- if (schema == target.schema | lower or schema.startswith(target.schema | lower ~ '_'))
             and not schema.endswith('dbt_test__audit')
             and full_name not in expected -%}
             {%- do orphan.append(row) -%}
