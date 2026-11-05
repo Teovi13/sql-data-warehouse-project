@@ -42,13 +42,13 @@ models:
       - name: last_name
         description: "Last name, trimmed."
       - name: country
-        description: "Country of residence from the ERP. n/a when the ERP has no location for the customer."
+        description: "Country of residence from the ERP. n/a when the ERP has no location for the customer. {{ doc('unknown_value') }}"
         data_tests:
           - not_null
       - name: marital_status
-        description: "Single, Married or n/a."
+        description: "Single, Married or n/a. {{ doc('unknown_value') }}"
       - name: gender
-        description: "Male, Female or n/a. The CRM value has priority; the ERP value is used when the CRM says n/a."
+        description: "Male, Female or n/a. The CRM value has priority; the ERP value is used when the CRM says n/a. {{ doc('unknown_value') }}"
         data_tests:
           - not_null
       - name: birthdate
@@ -87,9 +87,9 @@ models:
         data_tests:
           - not_null
       - name: subcategory
-        description: "Product subcategory from the ERP."
+        description: "Product subcategory from the ERP. {{ doc('unknown_value') }}"
       - name: maintenance
-        description: "Yes, No or n/a."
+        description: "Yes, No or n/a {{ doc('unknown_value') }}"
       - name: cost
         description: "Product cost. 0 when the source cost was missing or negative."
       - name: product_line

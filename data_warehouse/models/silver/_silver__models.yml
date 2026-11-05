@@ -40,7 +40,7 @@ models:
         data_tests:
           - no_untrimmed_values
       - name: cst_marital_status
-        description: "Single, Married or n/a. Both codes (S, M) and full words are accepted in the source."
+        description: "Single, Married or n/a. Both codes (S, M) and full words are accepted in the source. {{ doc('unknown_value') }}"
         data_tests:
           - accepted_values:
               arguments:
@@ -52,7 +52,7 @@ models:
               arguments:
                 values: ['Female', 'Male', 'n/a']
       - name: cst_create_date
-        description: "Date the customer record was created in the CRM. Used to keep the most recent record per customer."
+        description: "Date the customer record was created in the CRM. Used to keep the most recent record per customer. {{ doc('unknown_value') }}"
       - name: dwh_create_date
         description: "{{ doc('dwh_create_date') }}"
 
@@ -85,7 +85,7 @@ models:
         data_tests:
           - not_null
       - name: prd_line
-        description: "Mountain, Road, Other Sales, Touring or n/a, decoded from M, R, S and T."
+        description: "Mountain, Road, Other Sales, Touring or n/a, decoded from M, R, S and T. {{ doc('unknown_value') }}"
         data_tests:
           - accepted_values:
               arguments:
@@ -151,7 +151,7 @@ models:
       - name: bdate
         description: "Birthdate. NULL when missing or later than the reference date (var reference_date, default: the run start date)."
       - name: gen
-        description: "Female, Male or n/a. Codes and full words are both accepted in the source."
+        description: "Female, Male or n/a. Codes and full words are both accepted in the source. {{ doc('unknown_value') }}"
         data_tests:
           - accepted_values:
               arguments:
@@ -173,7 +173,7 @@ models:
           - unique
           - not_null
       - name: cntry
-        description: "Country name. DE becomes Germany, US and USA become United States, and empty or missing values become n/a."
+        description: "Country name. DE becomes Germany, US and USA become United States, and empty or missing values become n/a. {{ doc('unknown_value') }}"
         data_tests:
           - accepted_values:
               arguments:
@@ -205,7 +205,7 @@ models:
         data_tests:
           - no_untrimmed_values
       - name: maintenance
-        description: "Yes, No or n/a: whether products of this category need maintenance."
+        description: "Yes, No or n/a: whether products of this category need maintenance. {{ doc('unknown_value') }}"
         data_tests:
           - accepted_values:
               arguments:
