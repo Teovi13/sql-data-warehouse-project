@@ -2,14 +2,18 @@
 # Models: Silver layer
 # =============================================================================
 # Purpose:
-#     Generic data tests for the Silver models: parity with the legacy Silver
-#     tables, primary keys, the keys used by the Gold joins, untrimmed text,
-#     and the domains of the decoded columns. The business rules of
-#     crm_sales_details are singular tests in tests/silver/.
+#     Descriptions and generic data tests for the Silver models: parity with
+#     the legacy Silver tables, primary keys, the keys used by the Gold joins,
+#     untrimmed text, and the domains of the decoded columns. The business
+#     rules of crm_sales_details are singular tests in tests/silver/.
 # =============================================================================
 
 models:
   - name: crm_cust_info
+    description: >
+      Customer master data from the CRM, one row per customer: the most
+      recent record of each customer ID, with trimmed names and decoded
+      marital status and gender.
     data_tests:
       - parity_with:
           arguments:
@@ -17,32 +21,46 @@ models:
             exclude_columns: ['dwh_create_date']
     columns:
       - name: cst_id
+        description: "CRM customer ID. Primary key."
         data_tests:
           - unique
           - not_null
       - name: cst_key
+        description: "CRM customer number (for example AW10009). Key used to join with the ERP tables."
         data_tests:
           - unique
           - not_null
           - no_untrimmed_values
       - name: cst_firstname
+        description: "First name, without leading or trailing spaces."
         data_tests:
           - no_untrimmed_values
       - name: cst_lastname
+        description: "Last name, without leading or trailing spaces."
         data_tests:
           - no_untrimmed_values
       - name: cst_marital_status
+        description: "Single, Married or n/a. Both codes (S, M) and full words are accepted in the source."
         data_tests:
           - accepted_values:
               arguments:
                 values: ['Married', 'Single', 'n/a']
       - name: cst_gndr
+        description: "Female, Male or n/a, decoded from F and M."
         data_tests:
           - accepted_values:
               arguments:
                 values: ['Female', 'Male', 'n/a']
+      - name: cst_create_date
+        description: "Date the customer record was created in the CRM. Used to keep the most recent record per customer."
+      - name: dwh_create_date
+        description: "{{ doc('dwh_create_date') }}"
 
   - name: crm_prd_info
+    description: >
+      Product versions from the CRM, one row per version: the product key is
+      split into category ID and product number, invalid costs become 0, and
+      each version ends the day before the next one starts.
     data_tests:
       - parity_with:
           arguments:
@@ -50,29 +68,75 @@ models:
             exclude_columns: ['dwh_create_date']
     columns:
       - name: prd_id
+        description: "CRM ID of the product version. Primary key: each new version of a product gets a new ID."
         data_tests:
           - unique
           - not_null
+      - name: cat_id
+        description: "Category ID: the first five characters of the source product key, with an underscore instead of the dash, to match the ERP category IDs."
+      - name: prd_key
+        description: "Product number: the source product key without its category prefix. Identifies the product across its versions."
+      - name: prd_nm
+        description: "Product name."
+        data_tests:
+          - no_untrimmed_values
       - name: prd_cost
+        description: "Product cost. Negative or missing source values become 0."
         data_tests:
           - not_null
       - name: prd_line
+        description: "Mountain, Road, Other Sales, Touring or n/a, decoded from M, R, S and T."
         data_tests:
           - accepted_values:
               arguments:
                 values: ['Mountain', 'Other Sales', 'Road', 'Touring', 'n/a']
-      - name: prd_nm
-        data_tests:
-          - no_untrimmed_values
+      - name: prd_start_dt
+        description: "Date this version of the product became valid."
+      - name: prd_end_dt
+        description: "Last day this version was valid: the day before the next version starts. NULL for the current version."
+      - name: dwh_create_date
+        description: "{{ doc('dwh_create_date') }}"
 
   - name: crm_sales_details
+    description: >
+      Sales lines from the CRM, one row per product within an order: integer
+      dates become DATE, and sales and price are rebuilt when they are
+      missing or inconsistent.
     data_tests:
       - parity_with:
           arguments:
             legacy: source('legacy_silver', 'crm_sales_details')
             exclude_columns: ['dwh_create_date']
+    columns:
+      - name: sls_ord_num
+        description: "Order number. Together with sls_prd_key, it identifies a sales line."
+      - name: sls_prd_key
+        description: "Product number of the line (matches prd_key in crm_prd_info)."
+      - name: sls_cust_id
+        description: "CRM customer ID of the order (matches cst_id in crm_cust_info)."
+      - name: sls_order_dt
+        description: "Order date. NULL when the source value is 0 or not a valid yyyymmdd date."
+      - name: sls_ship_dt
+        description: "Ship date. NULL when the source value is 0 or not a valid yyyymmdd date."
+      - name: sls_due_dt
+        description: "Due date."
+      - name: sls_sales
+        description: >
+          Line amount. Rebuilt as quantity times the absolute price when
+          missing, not positive or inconsistent. NULL for three sales with
+          neither sales nor price in the source.
+      - name: sls_quantity
+        description: "Units sold."
+      - name: sls_price
+        description: "Unit price. Derived from sales divided by quantity (integer division) when missing or not positive."
+      - name: dwh_create_date
+        description: "{{ doc('dwh_create_date') }}"
 
   - name: erp_cust_az12
+    description: >
+      Customer demographics from the ERP: IDs without the NAS prefix,
+      birthdates after the reference date set to NULL, and standardized
+      gender.
     data_tests:
       - parity_with:
           arguments:
@@ -80,16 +144,23 @@ models:
             exclude_columns: ['dwh_create_date']
     columns:
       - name: cid
+        description: "ERP customer ID without the NAS prefix, so it matches cst_key in crm_cust_info."
         data_tests:
           - unique
           - not_null
+      - name: bdate
+        description: "Birthdate. NULL when missing or later than the reference date (var reference_date, default: the run start date)."
       - name: gen
+        description: "Female, Male or n/a. Codes and full words are both accepted in the source."
         data_tests:
           - accepted_values:
               arguments:
                 values: ['Female', 'Male', 'n/a']
+      - name: dwh_create_date
+        description: "{{ doc('dwh_create_date') }}"
 
   - name: erp_loc_a101
+    description: "Customer location from the ERP: IDs without dashes and standardized country names."
     data_tests:
       - parity_with:
           arguments:
@@ -97,18 +168,23 @@ models:
             exclude_columns: ['dwh_create_date']
     columns:
       - name: cid
+        description: "ERP customer ID without dashes, so it matches cst_key in crm_cust_info."
         data_tests:
           - unique
           - not_null
       - name: cntry
+        description: "Country name. DE becomes Germany, US and USA become United States, and empty or missing values become n/a."
         data_tests:
           - accepted_values:
               arguments:
                 values: ['Australia', 'France', 'Germany', 'Spain', 'United States', 'n/a']
               config:
                 severity: warn
+      - name: dwh_create_date
+        description: "{{ doc('dwh_create_date') }}"
 
   - name: erp_px_cat_g1v2
+    description: "Product category reference from the ERP: category, subcategory and a standardized maintenance flag."
     data_tests:
       - parity_with:
           arguments:
@@ -116,17 +192,23 @@ models:
             exclude_columns: ['dwh_create_date']
     columns:
       - name: id
+        description: "Category ID (for example BI_RO). Matches cat_id in crm_prd_info."
         data_tests:
           - unique
           - not_null
+      - name: cat
+        description: "Product category."
+        data_tests:
+          - no_untrimmed_values
+      - name: subcat
+        description: "Product subcategory."
+        data_tests:
+          - no_untrimmed_values
       - name: maintenance
+        description: "Yes, No or n/a: whether products of this category need maintenance."
         data_tests:
           - accepted_values:
               arguments:
                 values: ['No', 'Yes', 'n/a']
-      - name: cat
-        data_tests:
-          - no_untrimmed_values
-      - name: subcat
-        data_tests:
-          - no_untrimmed_values
+      - name: dwh_create_date
+        description: "{{ doc('dwh_create_date') }}"

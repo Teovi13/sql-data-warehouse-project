@@ -2,17 +2,20 @@
 # Models: Gold layer
 # =============================================================================
 # Purpose:
-#     Generic data tests for the star schema: parity with the legacy Gold
-#     views (surrogate keys excluded: they are hashes in dbt, ROW_NUMBER
-#     values in the legacy views; tests/gold checks that they still resolve
-#     to the same customers and products), unique surrogate and business
-#     keys in the dimensions, attributes that must never be NULL, the grain
-#     of the fact table, and its foreign keys (not_null + relationships,
+#     Descriptions and generic data tests for the star schema: parity with the
+#     legacy Gold views (surrogate keys excluded: they are hashes in dbt,
+#     ROW_NUMBER values in the legacy views; tests/gold checks that they still
+#     resolve to the same customers and products), unique surrogate and
+#     business keys in the dimensions, attributes that must never be NULL, the
+#     grain of the fact table, and its foreign keys (not_null + relationships,
 #     because relationships alone skips NULL keys).
 # =============================================================================
 
 models:
   - name: dim_customers
+    description: >
+      Customer dimension, one row per customer. Combines the CRM identity
+      data with the ERP demographics and location.
     data_tests:
       - parity_with:
           arguments:
@@ -20,25 +23,43 @@ models:
             exclude_columns: ['customer_key']
     columns:
       - name: customer_key
+        description: "{{ doc('customer_key') }}"
         data_tests:
           - unique
           - not_null
       - name: customer_id
+        description: "CRM customer ID (cst_id). Business key: fact_sales finds the customer with it."
         data_tests:
           - unique
           - not_null
       - name: customer_number
+        description: "CRM customer number (cst_key), used to match the customer with the ERP data."
         data_tests:
           - unique
           - not_null
+      - name: first_name
+        description: "First name, trimmed."
+      - name: last_name
+        description: "Last name, trimmed."
       - name: country
+        description: "Country of residence from the ERP. n/a when the ERP has no location for the customer."
         data_tests:
           - not_null
+      - name: marital_status
+        description: "Single, Married or n/a."
       - name: gender
+        description: "Male, Female or n/a. The CRM value has priority; the ERP value is used when the CRM says n/a."
         data_tests:
           - not_null
+      - name: birthdate
+        description: "Birthdate from the ERP. NULL when unknown."
+      - name: create_date
+        description: "Date the customer was created in the CRM."
 
   - name: dim_products
+    description: >
+      Product dimension, one row per product: only the current version of
+      each product, enriched with its ERP category.
     data_tests:
       - parity_with:
           arguments:
@@ -46,18 +67,41 @@ models:
             exclude_columns: ['product_key']
     columns:
       - name: product_key
+        description: "{{ doc('product_key') }}"
         data_tests:
           - unique
           - not_null
+      - name: product_id
+        description: "CRM ID of the current version of the product (prd_id)."
       - name: product_number
+        description: "Product number. Business key: fact_sales finds the product with it."
         data_tests:
           - unique
           - not_null
+      - name: product_name
+        description: "Product name."
+      - name: category_id
+        description: "Category ID (for example BI_RO)."
       - name: category
+        description: "Product category from the ERP (Bikes, Components, Accessories)."
         data_tests:
           - not_null
+      - name: subcategory
+        description: "Product subcategory from the ERP."
+      - name: maintenance
+        description: "Yes, No or n/a."
+      - name: cost
+        description: "Product cost. 0 when the source cost was missing or negative."
+      - name: product_line
+        description: "Mountain, Road, Other Sales, Touring or n/a."
+      - name: start_date
+        description: "Date the current version of the product became valid."
 
   - name: fact_sales
+    description: >
+      Sales fact table. Grain: one row per product within one order
+      (order_number + product_key). Sales whose customer or product is not
+      found keep a NULL key instead of being dropped.
     data_tests:
       - parity_with:
           arguments:
@@ -67,17 +111,33 @@ models:
           arguments:
             combination_of_columns: ['order_number', 'product_key']
     columns:
-      - name: customer_key
-        data_tests:
-          - not_null
-          - relationships:
-              arguments:
-                to: ref('dim_customers')
-                field: customer_key
+      - name: order_number
+        description: "Order number. Not unique by itself: an order can have several product lines."
       - name: product_key
+        description: "{{ doc('product_key') }}"
         data_tests:
           - not_null
           - relationships:
               arguments:
                 to: ref('dim_products')
                 field: product_key
+      - name: customer_key
+        description: "{{ doc('customer_key') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_key
+      - name: order_date
+        description: "Order date. NULL when the source date was invalid (see sls_order_dt in Silver)."
+      - name: shipping_date
+        description: "Ship date."
+      - name: due_date
+        description: "Due date."
+      - name: sales_amount
+        description: "Line amount (quantity times price). NULL for three sales with neither sales nor price in the source."
+      - name: quantity
+        description: "Units sold."
+      - name: price
+        description: "Unit price."
