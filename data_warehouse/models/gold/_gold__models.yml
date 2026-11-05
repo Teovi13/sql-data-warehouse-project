@@ -87,13 +87,13 @@ models:
         data_tests:
           - not_null
       - name: subcategory
-        description: "Product subcategory from the ERP. {{ doc('unknown_value') }}"
+        description: "Product subcategory from the ERP."
       - name: maintenance
-        description: "Yes, No or n/a {{ doc('unknown_value') }}"
+        description: "Yes, No or n/a. {{ doc('unknown_value') }}"
       - name: cost
         description: "Product cost. 0 when the source cost was missing or negative."
       - name: product_line
-        description: "Mountain, Road, Other Sales, Touring or n/a."
+        description: "Mountain, Road, Other Sales, Touring or n/a. {{ doc('unknown_value') }}"
       - name: start_date
         description: "Date the current version of the product became valid."
 
