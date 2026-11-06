@@ -52,7 +52,7 @@ models:
               arguments:
                 values: ['Female', 'Male', 'n/a']
       - name: cst_create_date
-        description: "Date the customer record was created in the CRM. Used to keep the most recent record per customer.}}"
+        description: "Date the customer record was created in the CRM. Used to keep the most recent record per customer."
       - name: dwh_create_date
         description: "{{ doc('dwh_create_date') }}"
 
