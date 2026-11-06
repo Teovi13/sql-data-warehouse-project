@@ -1,0 +1,41 @@
+# =============================================================================
+# Snapshots
+# =============================================================================
+# Purpose:
+#     Type 2 history of the tables whose source keeps only the current state.
+#     Each run compares the query with the previous run and closes the
+#     version of every row that changed. A snapshot is state, not a derived
+#     table: it cannot be rebuilt from Bronze, so it is never dropped.
+# =============================================================================
+
+snapshots:
+  - name: crm_cust_info_snapshot
+    description: >
+        Type 2 history of the CRM customer attributes, one row per version of each
+        customer. On every run, a change in name, marital status or gender closes the
+        current version and opens a new one. dbt_valid_from is the run that detected
+        the change, not the moment it happened in the CRM. Changes in letter case
+        only are not detected (case-insensitive collation).
+    relation: ref('crm_cust_info')
+    config:
+      unique_key: cst_id
+      strategy: check
+      check_cols: ['cst_firstname', 'cst_lastname', 'cst_marital_status', 'cst_gndr']
+      hard_deletes: invalidate
+      dbt_valid_to_current: "cast('9999-12-31' as datetime2(6))"
+    columns:
+      - name: dbt_scd_id
+        description: >
+         Unique ID of the version: hash of cst_id and the run that captured it.
+        data_tests:
+          - unique
+          - not_null
+      - name: dbt_valid_from
+        description: >
+          Start of the version: the run that captured it.
+      - name: dbt_valid_to
+        description: >
+          End of the version: the run that saw it change or disappear. 9999-12-31 for the current version.
+      - name: dbt_updated_at
+        description: >
+          Run that captured the version (the same as dbt_valid_from with the check strategy).

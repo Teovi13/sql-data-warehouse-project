@@ -42,3 +42,11 @@ data_tests:
 
 vars:
   reference_date: "{{ run_started_at.strftime('%Y-%m-%d') }}"
+
+snapshots:
+  data_warehouse:
+    +schema: snapshots
+    +as_columnstore: false
+    +persist_docs:
+      relation: true
+      columns: true
