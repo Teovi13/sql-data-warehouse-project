@@ -24,6 +24,9 @@ clean-targets:         # directories to be removed by `dbt clean`
 
 models:
   data_warehouse:
+    +persist_docs:
+      relation: true
+      columns: true
     silver:
       +materialized: table
       +schema: silver
