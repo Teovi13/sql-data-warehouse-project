@@ -3,7 +3,8 @@
 A [dbt](https://docs.getdbt.com/) project that rebuilds the **Silver** and
 **Gold** layers of the warehouse — today built by the T-SQL scripts in
 [`scripts/`](../scripts/) — as version-controlled `SELECT` models, with data
-tests and an automatic parity check against the original warehouse.
+tests, model and column documentation, and an automatic parity check against
+the original warehouse.
 
 **Status: migration in progress.** dbt builds into its own development
 schemas (`dbt_dev_silver`, `dbt_dev_gold`), next to the original `silver` and
@@ -100,8 +101,10 @@ dbt test  --select test_name:parity_with    # only the parity checks
 dbt build --vars "{reference_date: '2027-06-16'}"   # rebuild as of another date
 ```
 
-Expected result of `dbt build` with the included dataset: **63 nodes
-(9 models, 61 tests), `PASS=69 WARN=1`**. The warning is
+Expected result of `dbt build` with the included dataset: **73 nodes
+(9 models, 61 tests, 3 exposures), `PASS=69 WARN=1 NO-OP=3`**. Exposures
+run nothing: they are `NO-OP` when everything upstream of them succeeded, and
+`SKIP` when something upstream failed. The warning is
 `assert_crm_sales_details_amounts_consistent` with 3 rows: the three sales
 that have neither `sales` nor `price` in the source and cannot be rebuilt
 (SO54036, SO54051, SO54139). A fourth one turns the warning into an error.
@@ -118,6 +121,14 @@ dbt run-operation list_orphan_relations                          # list only
 dbt run-operation list_orphan_relations --args "{dry_run: false}" # drop (dev target only)
 ```
 
+Documentation site (see [Documentation](#documentation)):
+
+```powershell
+dbt docs generate            # site data in target/ (manifest.json, catalog.json)
+dbt docs serve               # site at http://localhost:8080
+dbt docs generate --static   # also target/static_index.html: one file, opens without a server
+```
+
 ---
 
 ## Project structure
@@ -128,14 +139,18 @@ data_warehouse/
 ├── packages.yml               # dbt packages (dbt_utils)
 ├── package-lock.yml           # Exact package versions installed by dbt deps
 ├── models/
+│   ├── _exposures.yml         # Consumers of Gold outside dbt (analysis repository)
 │   ├── bronze/
 │   │   └── _bronze__sources.yml   # Bronze tables as sources (loaded outside dbt)
 │   ├── legacy/
 │   │   └── _legacy__sources.yml   # Legacy silver/gold, only for the parity tests
 │   ├── silver/                # 6 models, materialized as tables
-│   │   └── _silver__models.yml    # Generic tests of Silver
-│   └── gold/                  # 3 models (star schema), materialized as views
-│       └── _gold__models.yml      # Generic tests of Gold
+│   │   └── _silver__models.yml    # Descriptions and generic tests of Silver
+│   ├── gold/                  # 3 models (star schema), materialized as views
+│   │   └── _gold__models.yml      # Descriptions and generic tests of Gold
+│   └── docs/
+│       ├── _shared__docs.md       # Doc blocks reused by several columns
+│       └── overview.md            # Home page of the documentation site
 ├── macros/
 │   ├── get_column_list.sql    # Column list of a relation (used by the parity test)
 │   └── list_orphan_relations.sql  # run-operation: list or drop relations no model declares
@@ -157,8 +172,8 @@ data_warehouse/
 | Gold | `dim_products` | View | `crm_prd_info`, `erp_px_cat_g1v2` |
 | Gold | `fact_sales` | View | `crm_sales_details`, `dim_customers`, `dim_products` |
 
-Model and column names are the same as in the T-SQL warehouse, so Power BI,
-the [analysis repository](https://github.com/Teovi13/sql-data-analysis-project)
+Model and column names are the same as in the T-SQL warehouse, so the
+[analysis repository](https://github.com/Teovi13/sql-data-analysis-project)
 and [`docs/data_catalog.md`](../docs/data_catalog.md) keep working after the
 cutover. One deliberate difference: `customer_key` and `product_key` are hashes
 of the business keys (`varchar(32)`) instead of `ROW_NUMBER()` values (`bigint`),
@@ -199,6 +214,55 @@ same customer and product (business keys).
 
 ---
 
+## Documentation
+
+Every model and column has a description, written next to its tests in
+`_silver__models.yml` and `_gold__models.yml`. Texts shared by several columns
+are written once as doc blocks in `models/docs/_shared__docs.md` (the load
+timestamp, the `'n/a'` convention and the two surrogate keys) and inserted
+with `{{ doc('...') }}`; `models/docs/overview.md` is the home page of the
+site. The site shows each model with its columns, types, tests and SQL, and
+the lineage graph from the Bronze sources to the exposures.
+
+**Descriptions in SQL Server.** `persist_docs`, set for every model in
+`dbt_project.yml`, writes the descriptions into the database as
+`MS_Description` extended properties each time a model is built. They are
+visible in SSMS (object Properties → Extended Properties) and in any tool
+that reads them:
+
+```sql
+SELECT OBJECT_SCHEMA_NAME(ep.major_id)  AS schema_name,
+       OBJECT_NAME(ep.major_id)         AS object_name,
+       c.name                           AS column_name,  -- NULL: the model itself
+       CAST(ep.value AS NVARCHAR(4000)) AS description
+FROM sys.extended_properties AS ep
+LEFT JOIN sys.columns AS c
+    ON c.object_id = ep.major_id
+   AND c.column_id = ep.minor_id
+WHERE ep.name = 'MS_Description'
+  AND OBJECT_SCHEMA_NAME(ep.major_id) IN ('dbt_dev_silver', 'dbt_dev_gold')
+ORDER BY schema_name, object_name, ep.minor_id;
+```
+
+With the current project it returns 78 rows: 9 models and 69 columns. The
+descriptions are stored as plain text, so Markdown (backticks, bold) appears
+as typed.
+
+**Exposures.** [`models/_exposures.yml`](models/_exposures.yml) declares the
+consumers of Gold that live outside dbt: the two report views and the
+exploratory scripts of the analysis repository. dbt does not run or check
+them; they appear at the end of the lineage and answer which consumers a
+change affects:
+
+```powershell
+dbt ls --select dim_customers+ --resource-type exposure
+```
+
+Until the cutover those consumers still read the legacy `gold` views, not the
+dbt models.
+
+---
+
 ## Packages
 
 [`packages.yml`](packages.yml) installs `dbt_utils` 1.x (exact version in
@@ -227,6 +291,10 @@ used: its overrides are named for the Fabric adapter, which dbt-sqlserver
   text column is cast to the type of the original Silver DDL.
 - **`dwh_create_date` is `sysdatetime()`** in each Silver model, replacing
   the `DEFAULT GETDATE()` of the DDL.
+- **Documentation lives with the code.** Descriptions sit next to the tests
+  of each model, are versioned with it and are written into SQL Server on
+  every build. Until the cutover, [`docs/data_catalog.md`](../docs/data_catalog.md)
+  remains the dictionary of the official Gold views.
 - **Surrogate keys are hashes of the business keys**
   (`dbt_utils.generate_surrogate_key`: MD5 of `cst_id` and of the product
   number). A key depends only on its own customer or product, so it never
@@ -258,6 +326,20 @@ used: its overrides are named for the Fabric adapter, which dbt-sqlserver
 - **Hashes of non-Latin text.** On SQL Server, `generate_surrogate_key` casts
   values to `varchar` before hashing, so characters outside the code page
   become `?`. The current business keys are numbers and ASCII codes.
+- **Descriptions are not tested.** dbt fails on a `doc()` block that does
+  not exist, but not on a description placed on the wrong column or on Jinja
+  left half-deleted, which is then stored as text. After editing
+  descriptions, this query must return no rows:
+  ```sql
+  SELECT OBJECT_SCHEMA_NAME(major_id) AS schema_name,
+         OBJECT_NAME(major_id)        AS object_name,
+         minor_id
+  FROM sys.extended_properties
+  WHERE name = 'MS_Description'
+    AND (CAST(value AS NVARCHAR(4000)) LIKE '%{{%'
+      OR CAST(value AS NVARCHAR(4000)) LIKE '%}}%'
+      OR CAST(value AS NVARCHAR(4000)) LIKE '%{[%]%');
+  ```
 - **Tie between customer records.** If two records of a customer share the
   creation date, the choice would be arbitrary; the Bronze test stops the
   build instead. The lasting fix is a source row number from the ingestion
@@ -267,6 +349,6 @@ used: its overrides are named for the Fabric adapter, which dbt-sqlserver
 
 ## Next steps
 
-Model and column documentation with `dbt docs`; snapshots for history; and
-the cutover: a `prod` target that builds into `silver` and `gold`, retirement
-of the T-SQL procedures and of the parity tests.
+Snapshots for history; and the cutover: a `prod` target that builds into
+`silver` and `gold`, retirement of the T-SQL procedures and of the parity
+tests, and the dbt documentation as the only data dictionary of Gold.

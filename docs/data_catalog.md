@@ -4,6 +4,14 @@ This document describes the Gold layer, which is what analysts query, and the
 operational table `bronze.load_log`, which records the loads made by the
 Python ingestion layer.
 
+> **dbt layer.** Silver and Gold are being rebuilt in dbt
+> ([`data_warehouse/`](../data_warehouse/README.md)), which documents every
+> model and column in its own YAML files and writes the descriptions into SQL
+> Server. Until the cutover, this dictionary describes the official Gold views
+> built by the T-SQL scripts. The column names are the same in dbt; the one
+> difference is the type of `customer_key` and `product_key`: MD5 hashes
+> (`VARCHAR(32)`) instead of `ROW_NUMBER()` integers.
+
 # Gold Layer
 
 ## gold.dim_customers
@@ -14,7 +22,7 @@ from the ERP system.
 
 | Column | Data Type | Description |
 |---|---|---|
-| `customer_key` | `INT` | Surrogate key. Sequential integer generated with `ROW_NUMBER()`, used to join to `gold.fact_sales`. Has no business meaning outside the warehouse. |
+| `customer_key` | `BIGINT` | Surrogate key. Sequential integer generated with `ROW_NUMBER()`, used to join to `gold.fact_sales`. Has no business meaning outside the warehouse. |
 | `customer_id` | `INT` | Original customer identifier from the CRM source system (`cst_id`). |
 | `customer_number` | `NVARCHAR(50)` | Business/natural key for the customer (`cst_key`). Used to match customers across CRM and ERP sources. |
 | `first_name` | `NVARCHAR(50)` | Customer's first name, trimmed of leading/trailing spaces. |
@@ -34,7 +42,7 @@ retired product versions are filtered out — see note below).
 
 | Column | Data Type | Description |
 |---|---|---|
-| `product_key` | `INT` | Surrogate key. Sequential integer generated with `ROW_NUMBER()`, used to join to `gold.fact_sales`. |
+| `product_key` | `BIGINT` | Surrogate key. Sequential integer generated with `ROW_NUMBER()`, used to join to `gold.fact_sales`. |
 | `product_id` | `INT` | Original product identifier from the CRM source system (`prd_id`). |
 | `product_number` | `NVARCHAR(50)` | Business/natural key for the product (`prd_key`), used to join against `sls_prd_key` in the sales data. |
 | `product_name` | `NVARCHAR(50)` | Descriptive name of the product. |
@@ -63,8 +71,8 @@ Sales fact table. One row per line item of a sales order. Grain:
 | Column | Data Type | Description |
 |---|---|---|
 | `order_number` | `NVARCHAR(50)` | Business identifier of the sales order (`sls_ord_num`). Not unique by itself at this grain — an order can contain multiple product lines. |
-| `product_key` | `INT` | Foreign key to `gold.dim_products.product_key`. Resolved via `product_number` (matched to `sls_prd_key`). |
-| `customer_key` | `INT` | Foreign key to `gold.dim_customers.customer_key`. Resolved via `customer_id` (matched to `sls_cust_id`). |
+| `product_key` | `BIGINT` | Foreign key to `gold.dim_products.product_key`. Resolved via `product_number` (matched to `sls_prd_key`). |
+| `customer_key` | `BIGINT` | Foreign key to `gold.dim_customers.customer_key`. Resolved via `customer_id` (matched to `sls_cust_id`). |
 | `order_date` | `DATE` | Date the order was placed. |
 | `shipping_date` | `DATE` | Date the order was shipped. |
 | `due_date` | `DATE` | Date the order was expected/due. |
