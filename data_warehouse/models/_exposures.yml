@@ -1,0 +1,62 @@
+# =============================================================================
+# Exposures
+# =============================================================================
+# Purpose:
+#     Consumers of the Gold layer that live outside dbt: the report views and
+#     the exploratory scripts of the analysis repository. dbt does not build
+#     or run them; they are declared so that the lineage shows who reads each
+#     model, and so that a change can be checked against its consumers
+#     (dbt ls --select <model>+ --resource-type exposure).
+# =============================================================================
+
+exposures:
+  - name: customer_report
+    label: Customer Report
+    type: analysis
+    maturity: medium
+    url: https://github.com/Teovi13/sql-data-analysis-project/blob/main/scripts/12_report_customers.sql
+    description: >
+      View gold.report_customers, created by the analysis repository: one row per
+      customer with segments (VIP, Regular, New), age groups and KPIs such as
+      recency, average order value and average monthly spend. Joins fact_sales and
+      dim_customers on customer_key. Until the cutover it reads the legacy gold
+      schema, not the dbt models.
+    depends_on:
+      - ref('fact_sales')
+      - ref('dim_customers')
+    owner:
+      name: Teovi13
+
+  - name: product_report
+    label: Product Report
+    type: analysis
+    maturity: medium
+    url: https://github.com/Teovi13/sql-data-analysis-project/blob/main/scripts/13_report_products.sql
+    description: >
+      View gold.report_products, created by the analysis repository: one row per
+      product with revenue segments (High-Performer, Mid-Range, Low-Performer) and
+      KPIs such as recency, average order revenue and average monthly revenue. Joins
+      fact_sales and dim_products on product_key. Until the cutover it reads the
+      legacy gold schema, not the dbt models.
+    depends_on:
+      - ref('fact_sales')
+      - ref('dim_products')
+    owner:
+      name: Teovi13
+
+  - name: exploratory_analysis
+    label: Exploratory Analysis
+    type: analysis
+    maturity: low
+    url: https://github.com/Teovi13/sql-data-analysis-project/tree/main/scripts
+    description: >
+      Exploratory SQL scripts of the analysis repository (scripts 01 to 11):
+      dimensions, dates, measures, magnitude, ranking, change over time, cumulative,
+      part-to-whole, segmentation and performance analyses. Ad hoc queries, not
+      scheduled. Until the cutover they read the legacy gold schema.
+    depends_on:
+      - ref('dim_customers')
+      - ref('dim_products')
+      - ref('fact_sales')
+    owner:
+      name: Teovi13
