@@ -15,6 +15,6 @@ select
     cst_id,
     count(*) as current_versions
 from {{ ref('crm_cust_info_snapshot') }}
-where dbt_valid_to = '9999-12-31'
+where dbt_valid_to = '{{ var("scd_end_date") }}'
 group by cst_id
 having count(*) > 1

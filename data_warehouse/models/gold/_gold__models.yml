@@ -97,6 +97,64 @@ models:
       - name: start_date
         description: "Date the current version of the product became valid."
 
+  - name: dim_products_history
+    description: >
+      Product dimension with history (type 2): one row per version of each product,
+      from the CRM product versions. Each version is valid from valid_from to
+      valid_to, both inclusive, with no gaps or overlaps between the versions of a
+      product, so a sale finds the version in force on its order date with a
+      BETWEEN join. The first version of each product is valid from 1900-01-01:
+      sales dated before the first known version belong to it.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['product_number', 'valid_from']
+    columns:
+      - name: product_version_key
+        description: "Surrogate key of the version: MD5 hash of the product number and the start date of the version."
+        data_tests:
+          - unique
+          - not_null
+      - name: product_key
+        description: "Durable key of the product, the same as product_key in dim_products: equal in every version, so it links each version with the current one."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_key
+      - name: product_id
+        description: "CRM ID of the version (prd_id)."
+      - name: product_number
+        description: "Product number. Business key: the same in every version of the product."
+        data_tests:
+          - not_null
+          - unique:
+              config:
+                where: "is_current = 1"
+      - name: product_name
+        description: "Product name in this version."
+      - name: category_id
+        description: "Category ID (for example BI_RO)."
+      - name: category
+        description: "Product category from the ERP."
+      - name: subcategory
+        description: "Product subcategory from the ERP."
+      - name: maintenance
+        description: "Yes, No or n/a. {{ doc('unknown_value') }}"
+      - name: cost
+        description: "Cost in this version. 0 when the source cost was missing or negative."
+      - name: product_line
+        description: "Mountain, Road, Other Sales, Touring or n/a. {{ doc('unknown_value') }}"
+      - name: start_date
+        description: "Date the version became valid in the CRM (prd_start_dt)."
+      - name: valid_from
+        description: "First day the version is valid, inclusive: the start date, except for the first version of each product, which is valid from 1900-01-01."
+      - name: valid_to
+        description: "Last day the version is valid, inclusive: the day before the next version starts, or 9999-12-31 for the current version."
+      - name: is_current
+        description: "1 for the current version of each product, 0 for older versions."
+
   - name: fact_sales
     description: >
       Sales fact table. Grain: one row per product within one order

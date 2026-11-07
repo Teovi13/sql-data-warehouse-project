@@ -22,7 +22,7 @@ snapshots:
       strategy: check
       check_cols: ['cst_firstname', 'cst_lastname', 'cst_marital_status', 'cst_gndr']
       hard_deletes: invalidate
-      dbt_valid_to_current: "cast('9999-12-31' as datetime2(6))"
+      dbt_valid_to_current: "cast('{{ var('scd_end_date') }}' as datetime2(6))"
     columns:
       - name: dbt_scd_id
         description: >
