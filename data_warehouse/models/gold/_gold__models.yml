@@ -56,6 +56,70 @@ models:
       - name: create_date
         description: "Date the customer was created in the CRM."
 
+  - name: dim_customers_history
+    description: >
+      Customer dimension with history (type 2) on the CRM attributes: one row per
+      version of each customer, from crm_cust_info_snapshot. Names, marital status
+      and the CRM gender are historized; country, birthdate and the ERP gender
+      fallback come from the current ERP data, the same in every version. Versions
+      are half-open periods: valid from valid_from (inclusive) to valid_to
+      (exclusive). The first version of each customer is valid from 1900-01-01,
+      because the history starts with the first snapshot run. A customer has a gap
+      between versions while it was missing from the source.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['customer_id', 'valid_from']
+    columns:
+      - name: customer_version_key
+        description: "Surrogate key of the version: MD5 hash of the CRM customer ID and the moment the snapshot captured the version."
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_key
+        description: "Durable key of the customer, the same as customer_key in dim_customers: equal in every version."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_key
+              config:
+                severity: warn
+      - name: customer_id
+        description: "CRM customer ID (cst_id). Business key: the same in every version."
+        data_tests:
+          - not_null
+          - unique:
+              config:
+                where: "is_current = 1"
+      - name: customer_number
+        description: "CRM customer number (cst_key)."
+      - name: first_name
+        description: "First name in this version."
+      - name: last_name
+        description: "Last name in this version."
+      - name: country
+        description: "Current country of residence from the ERP, the same in every version (not historized). n/a when the ERP has no location for the customer. {{ doc('unknown_value') }}"
+      - name: marital_status
+        description: "Single, Married or n/a in this version. {{ doc('unknown_value') }}"
+      - name: gender
+        description: "Male, Female or n/a in this version. The CRM value has priority; the current ERP value is used when the CRM says n/a. {{ doc('unknown_value') }}"
+      - name: birthdate
+        description: "Birthdate from the ERP (current value). NULL when unknown."
+      - name: create_date
+        description: "Date the customer was created in the CRM."
+      - name: captured_at
+        description: "Moment the snapshot captured this version (dbt_valid_from in crm_cust_info_snapshot)."
+      - name: valid_from
+        description: "Start of the version, inclusive: captured_at, except for the first version of each customer, which is valid from 1900-01-01."
+      - name: valid_to
+        description: "End of the version, exclusive: the moment the customer changed or left the source, or 9999-12-31 for the current version."
+      - name: is_current
+        description: "1 for the current version of each customer, 0 for older versions. A customer that left the source has no current version."
+
+
+
   - name: dim_products
     description: >
       Product dimension, one row per product: only the current version of
