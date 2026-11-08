@@ -441,11 +441,14 @@ limitations of the layer are in [`ingestion/README.md`](ingestion/README.md).
 
 The Silver and Gold layers are being migrated to a [dbt](https://docs.getdbt.com/)
 project in [`data_warehouse/`](data_warehouse/): one `SELECT` per model, built
-in dependency order, with 61 data tests and a parity test that compares every
+in dependency order, with 93 data tests and a parity test that compares every
 dbt model with its T-SQL counterpart on each build. Every model and column is
 documented, with a browsable site (`dbt docs`) and the descriptions written
-into SQL Server, where SSMS shows them. During the migration dbt
-builds into its own schemas (`dbt_dev_silver`, `dbt_dev_gold`), and the T-SQL
+into SQL Server, where SSMS shows them. It adds type 2 history: product
+versions from the CRM, customer changes captured by dbt snapshots, and a fact
+table that points to the version in force on each sale. During the migration
+dbt builds into its own schemas (`dbt_dev_silver`, `dbt_dev_gold`,
+`dbt_dev_snapshots`), and the T-SQL
 scripts above remain the official way to build Silver and Gold. Setup and
 details in [`data_warehouse/README.md`](data_warehouse/README.md).
 
