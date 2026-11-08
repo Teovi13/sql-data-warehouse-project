@@ -118,8 +118,6 @@ models:
       - name: is_current
         description: "1 for the current version of each customer, 0 for older versions. A customer that left the source has no current version."
 
-
-
   - name: dim_products
     description: >
       Product dimension, one row per product: only the current version of

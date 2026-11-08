@@ -24,18 +24,80 @@ snapshots:
       hard_deletes: invalidate
       dbt_valid_to_current: "cast('{{ var('scd_end_date') }}' as datetime2(6))"
     columns:
+      - name: cst_id
+        description: "CRM customer ID. Snapshot unique key."
+        data_tests:
+          - one_current_version
       - name: dbt_scd_id
-        description: >
-         Unique ID of the version: hash of cst_id and the run that captured it.
+        description: "{{ doc('snapshot_scd_id') }}"
         data_tests:
           - unique
           - not_null
       - name: dbt_valid_from
-        description: >
-          Start of the version: the run that captured it.
+        description: "{{ doc('snapshot_valid_from') }}"
       - name: dbt_valid_to
-        description: >
-          End of the version: the run that saw it change or disappear. 9999-12-31 for the current version.
+        description: "{{ doc('snapshot_valid_to') }}"
       - name: dbt_updated_at
-        description: >
-          Run that captured the version (the same as dbt_valid_from with the check strategy).
+        description: "{{ doc('snapshot_updated_at') }}"
+
+  - name: erp_loc_a101_snapshot
+    description: >
+        Type 2 history of the ERP customer country, one row per version of each
+        customer location: a change in cntry closes the current version and opens
+        a new one. Not used by any model yet: it collects the history so that
+        dim_customers_history can later combine it with the CRM history.
+    relation: ref('erp_loc_a101')
+    config:
+      unique_key: cid
+      strategy: check
+      check_cols: ['cntry']
+      hard_deletes: invalidate
+      dbt_valid_to_current: "cast('{{ var('scd_end_date') }}' as datetime2(6))"
+    columns:
+      - name: cid
+        description: "ERP customer ID. Snapshot unique key."
+        data_tests:
+          - one_current_version
+      - name: dbt_scd_id
+        description: "{{ doc('snapshot_scd_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: dbt_valid_from
+        description: "{{ doc('snapshot_valid_from') }}"
+      - name: dbt_valid_to
+        description: "{{ doc('snapshot_valid_to') }}"
+      - name: dbt_updated_at
+        description: "{{ doc('snapshot_updated_at') }}"
+
+  - name: erp_cust_az12_snapshot
+    description: >
+        Type 2 history of the ERP customer gender, one row per version of each
+        customer. The birthdate is not compared: it never changes for a person,
+        and Silver sets future birthdates to NULL depending on the run date, so
+        comparing it would record changes the ERP never made. Not used by any
+        model yet: it collects the history so that dim_customers_history can
+        later combine it with the CRM history.
+    relation: ref('erp_cust_az12')
+    config:
+      unique_key: cid
+      strategy: check
+      check_cols: ['gen']
+      hard_deletes: invalidate
+      dbt_valid_to_current: "cast('{{ var('scd_end_date') }}' as datetime2(6))"
+    columns:
+      - name: cid
+        description: "ERP customer ID. Snapshot unique key."
+        data_tests:
+          - one_current_version
+      - name: dbt_scd_id
+        description: "{{ doc('snapshot_scd_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: dbt_valid_from
+        description: "{{ doc('snapshot_valid_from') }}"
+      - name: dbt_valid_to
+        description: "{{ doc('snapshot_valid_to') }}"
+      - name: dbt_updated_at
+        description: "{{ doc('snapshot_updated_at') }}"
