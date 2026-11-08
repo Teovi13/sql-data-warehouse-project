@@ -222,11 +222,14 @@ models:
       Sales fact table. Grain: one row per product within one order
       (order_number + product_key). Sales whose customer or product is not
       found keep a NULL key instead of being dropped.
+      Each sale carries two keys per dimension: the durable key joins the current
+      dimension, and the version key joins the history dimension with the version
+      in force on the sale.
     data_tests:
       - parity_with:
           arguments:
             legacy: source('legacy_gold', 'fact_sales')
-            exclude_columns: ['customer_key', 'product_key']
+            exclude_columns: ['customer_key', 'product_key', 'product_version_key', 'customer_version_key']
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: ['order_number', 'product_key']
@@ -241,6 +244,14 @@ models:
               arguments:
                 to: ref('dim_products')
                 field: product_key
+      - name: product_version_key
+        description: "Key of the product version in force on the sale (dim_products_history). {{ doc('version_lookup_date') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_products_history')
+                field: product_version_key
       - name: customer_key
         description: "{{ doc('customer_key') }}"
         data_tests:
@@ -249,6 +260,14 @@ models:
               arguments:
                 to: ref('dim_customers')
                 field: customer_key
+      - name: customer_version_key
+        description: "Key of the customer version in force on the sale (dim_customers_history). {{ doc('version_lookup_date') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers_history')
+                field: customer_version_key
       - name: order_date
         description: "Order date. NULL when the source date was invalid (see sls_order_dt in Silver)."
       - name: shipping_date

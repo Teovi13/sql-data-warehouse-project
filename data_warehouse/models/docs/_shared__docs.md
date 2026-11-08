@@ -42,3 +42,10 @@ the current version.
 Run that captured the version (the same as dbt_valid_from with the check
 strategy).
 {% enddocs %}
+
+{% docs version_lookup_date %}
+The version is the one in force on the order date or, when the order date is
+NULL (34 sales with an invalid date in the source), on the shipping date,
+which is 1 to 10 days after the order in the rest of the sales. The shipping
+date is used only to pick the version: order_date stays NULL.
+{% enddocs %}
