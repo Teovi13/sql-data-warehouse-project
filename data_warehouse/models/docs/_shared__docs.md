@@ -23,3 +23,29 @@ product number, built with `dbt_utils.generate_surrogate_key`. It depends only
 on the product itself, so it never changes when other products are added or
 removed. In the legacy warehouse it was a `ROW_NUMBER()` integer.
 {% enddocs %}
+
+{% docs snapshot_scd_id %}
+Unique ID of the version: hash of the snapshot unique key and the run that
+captured it.
+{% enddocs %}
+
+{% docs snapshot_valid_from %}
+Start of the version: the run that captured it.
+{% enddocs %}
+
+{% docs snapshot_valid_to %}
+End of the version: the run that saw it change or disappear. 9999-12-31 for
+the current version.
+{% enddocs %}
+
+{% docs snapshot_updated_at %}
+Run that captured the version (the same as dbt_valid_from with the check
+strategy).
+{% enddocs %}
+
+{% docs version_lookup_date %}
+The version is the one in force on the order date or, when the order date is
+NULL (34 sales with an invalid date in the source), on the shipping date,
+which is 1 to 10 days after the order in the rest of the sales. The shipping
+date is used only to pick the version: order_date stays NULL.
+{% enddocs %}

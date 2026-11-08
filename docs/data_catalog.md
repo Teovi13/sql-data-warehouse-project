@@ -10,7 +10,10 @@ Python ingestion layer.
 > Server. Until the cutover, this dictionary describes the official Gold views
 > built by the T-SQL scripts. The column names are the same in dbt; the one
 > difference is the type of `customer_key` and `product_key`: MD5 hashes
-> (`VARCHAR(32)`) instead of `ROW_NUMBER()` integers.
+> (`VARCHAR(32)`) instead of `ROW_NUMBER()` integers. The dbt layer also adds
+> history dimensions (`dim_products_history`, `dim_customers_history`) and two
+> version keys in `fact_sales`, which have no legacy counterpart; they are
+> documented in the dbt project.
 
 # Gold Layer
 

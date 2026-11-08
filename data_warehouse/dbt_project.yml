@@ -42,3 +42,21 @@ data_tests:
 
 vars:
   reference_date: "{{ run_started_at.strftime('%Y-%m-%d') }}"
+  # Validity bounds of the type 2 tables. Never change scd_end_date once a
+  # snapshot has data: its current rows already store this value.
+  scd_start_date: '1900-01-01'
+  scd_end_date: '9999-12-31'
+
+snapshots:
+  data_warehouse:
+    +schema: snapshots
+    +as_columnstore: false
+    +persist_docs:
+      relation: true
+      columns: true
+
+flags:
+  # Never widen a column across type families (varchar -> nvarchar,
+  # int -> bigint) automatically: on a snapshot, which cannot be rebuilt,
+  # a change like that in Silver must be reviewed, not applied silently.
+  dbt_sqlserver_enable_safe_type_expansion: false

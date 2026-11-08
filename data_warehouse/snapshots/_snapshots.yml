@@ -1,0 +1,103 @@
+# =============================================================================
+# Snapshots
+# =============================================================================
+# Purpose:
+#     Type 2 history of the tables whose source keeps only the current state.
+#     Each run compares the query with the previous run and closes the
+#     version of every row that changed. A snapshot is state, not a derived
+#     table: it cannot be rebuilt from Bronze, so it is never dropped.
+# =============================================================================
+
+snapshots:
+  - name: crm_cust_info_snapshot
+    description: >
+        Type 2 history of the CRM customer attributes, one row per version of each
+        customer. On every run, a change in name, marital status or gender closes the
+        current version and opens a new one. dbt_valid_from is the run that detected
+        the change, not the moment it happened in the CRM. Changes in letter case
+        only are not detected (case-insensitive collation).
+    relation: ref('crm_cust_info')
+    config:
+      unique_key: cst_id
+      strategy: check
+      check_cols: ['cst_firstname', 'cst_lastname', 'cst_marital_status', 'cst_gndr']
+      hard_deletes: invalidate
+      dbt_valid_to_current: "cast('{{ var('scd_end_date') }}' as datetime2(6))"
+    columns:
+      - name: cst_id
+        description: "CRM customer ID. Snapshot unique key."
+        data_tests:
+          - one_current_version
+      - name: dbt_scd_id
+        description: "{{ doc('snapshot_scd_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: dbt_valid_from
+        description: "{{ doc('snapshot_valid_from') }}"
+      - name: dbt_valid_to
+        description: "{{ doc('snapshot_valid_to') }}"
+      - name: dbt_updated_at
+        description: "{{ doc('snapshot_updated_at') }}"
+
+  - name: erp_loc_a101_snapshot
+    description: >
+        Type 2 history of the ERP customer country, one row per version of each
+        customer location: a change in cntry closes the current version and opens
+        a new one. Not used by any model yet: it collects the history so that
+        dim_customers_history can later combine it with the CRM history.
+    relation: ref('erp_loc_a101')
+    config:
+      unique_key: cid
+      strategy: check
+      check_cols: ['cntry']
+      hard_deletes: invalidate
+      dbt_valid_to_current: "cast('{{ var('scd_end_date') }}' as datetime2(6))"
+    columns:
+      - name: cid
+        description: "ERP customer ID. Snapshot unique key."
+        data_tests:
+          - one_current_version
+      - name: dbt_scd_id
+        description: "{{ doc('snapshot_scd_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: dbt_valid_from
+        description: "{{ doc('snapshot_valid_from') }}"
+      - name: dbt_valid_to
+        description: "{{ doc('snapshot_valid_to') }}"
+      - name: dbt_updated_at
+        description: "{{ doc('snapshot_updated_at') }}"
+
+  - name: erp_cust_az12_snapshot
+    description: >
+        Type 2 history of the ERP customer gender, one row per version of each
+        customer. The birthdate is not compared: it never changes for a person,
+        and Silver sets future birthdates to NULL depending on the run date, so
+        comparing it would record changes the ERP never made. Not used by any
+        model yet: it collects the history so that dim_customers_history can
+        later combine it with the CRM history.
+    relation: ref('erp_cust_az12')
+    config:
+      unique_key: cid
+      strategy: check
+      check_cols: ['gen']
+      hard_deletes: invalidate
+      dbt_valid_to_current: "cast('{{ var('scd_end_date') }}' as datetime2(6))"
+    columns:
+      - name: cid
+        description: "ERP customer ID. Snapshot unique key."
+        data_tests:
+          - one_current_version
+      - name: dbt_scd_id
+        description: "{{ doc('snapshot_scd_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: dbt_valid_from
+        description: "{{ doc('snapshot_valid_from') }}"
+      - name: dbt_valid_to
+        description: "{{ doc('snapshot_valid_to') }}"
+      - name: dbt_updated_at
+        description: "{{ doc('snapshot_updated_at') }}"
