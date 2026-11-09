@@ -234,9 +234,9 @@ table, plus a history dimension for each of them.
   per version, with its validity period. Each sale carries a version key for
   each of them, next to the keys of the current dimensions.
 
-The diagram shows the star schema as first designed, with integer surrogate
-keys; dbt builds them as MD5 hashes of the business keys and adds the history
-dimensions.
+All the keys are MD5 hashes that dbt builds from the business keys, not
+integers. `customer_key` and `product_key` are durable keys: they are the same
+in the current dimension and in every version of the history dimension.
 
 Column-by-column documentation: the dbt documentation site and SQL Server
 itself (see [`docs/data_catalog.md`](docs/data_catalog.md)).
