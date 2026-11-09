@@ -1,27 +1,26 @@
 # dbt transformation layer
 
-A [dbt](https://docs.getdbt.com/) project that rebuilds the **Silver** and
-**Gold** layers of the warehouse — today built by the T-SQL scripts in
-[`scripts/`](../scripts/) — as version-controlled `SELECT` models, with data
-tests, model and column documentation, an automatic parity check against the
-original warehouse, and type 2 history of products and customers.
+A [dbt](https://docs.getdbt.com/) project that builds the **Silver** and
+**Gold** layers of the warehouse as version-controlled `SELECT` models, with
+data tests, model and column documentation, and type 2 history of products
+and customers. Bronze is loaded outside dbt, by the
+[Python ingestion layer](../README.md#python-ingestion-layer) or
+`bronze.load_bronze`.
 
-**Status: migration in progress.** dbt builds into its own development
-schemas (`dbt_dev_silver`, `dbt_dev_gold`, `dbt_dev_snapshots`), next to the original `silver` and
-`gold`, which are still the official layers. Every dbt model is compared row
-by row with its legacy counterpart on each build; the cutover (dbt writing to
-`silver` and `gold`, and the T-SQL procedures retired) comes later.
+dbt is the official way to build Silver and Gold. The layers were first built
+by T-SQL scripts; how the migration was proven and how to roll it back is in
+[Migration and cutover](#migration-and-cutover).
 
 ---
 
-## What changes compared to the T-SQL scripts
+## What changed compared to the T-SQL scripts
 
 | T-SQL scripts | dbt |
 |---|---|
 | DDL scripts + `TRUNCATE`/`INSERT` procedures | One `SELECT` per model; dbt creates the table or view, and explicit `cast`s set the column types |
 | Run the scripts in the order of the README | `dbt build` runs everything in dependency order (the DAG built from `ref()` and `source()`) |
-| `silver.load_silver` loads table by table: a failure leaves some tables new, one empty and the rest old | Each table is built aside and swapped in by renaming; a failed model keeps its previous version |
-| Quality checks that someone runs and reads | 93 data tests with a pass/fail result and an exit code; a failing quality test stops the models built on top of it |
+| `silver.load_silver` loaded table by table: a failure left some tables new, one empty and the rest old | Each table is built aside and swapped in by renaming; a failed model keeps its previous version |
+| Quality checks that someone ran and read | 83 data tests with a pass/fail result and an exit code; a failing quality test stops the models built on top of it |
 | `GETDATE()` in the logic | One reference date per run (`var('reference_date')`), shared by the model and its test |
 | Only the current state of each customer and product in Gold | History tables (type 2): product versions from the CRM, customer changes captured by snapshots, and a fact table that points to the version in force on each sale |
 
@@ -29,12 +28,8 @@ by row with its legacy counterpart on each build; the cutover (dbt writing to
 
 ## Requirements
 
-- The `DataWarehouse` database with **Bronze loaded** (by the
-  [Python ingestion layer](../README.md#python-ingestion-layer) or
-  `bronze.load_bronze`).
-- While the migration lasts, the **legacy Silver and Gold built** too
-  (`silver.load_silver` and `scripts/gold/ddl_gold.sql`): the parity tests
-  compare against them.
+- The `DataWarehouse` database with **Bronze loaded** (steps 1 and 2 of
+  [How to run this project](../README.md#how-to-run-this-project)).
 - SQL Server 2017 or later, and the Microsoft ODBC Driver 18 for SQL Server.
 - Python 3.10 or later (developed with 3.13).
 - **dbt Core 1.12** with the community adapter `dbt-sqlserver` 1.12. dbt v2
@@ -61,12 +56,13 @@ dbt --version        # Core 1.12.x, plugin sqlserver 1.12.x
 
 Connection settings live outside the repository, in
 `%USERPROFILE%\.dbt\profiles.yml` (never inside `data_warehouse/`, where a
-`git add` could publish it). Example with Windows authentication and a named
-instance:
+`git add` could publish it). It has two outputs, called **targets**: `prod`
+builds the official layers, `dev` builds a private copy for development.
+Example with Windows authentication and a named instance:
 
 ```yaml
 data_warehouse:
-  target: dev
+  target: dev                        # default: production only with --target prod
   outputs:
     dev:
       type: sqlserver
@@ -78,14 +74,37 @@ data_warehouse:
       encrypt: true
       trust_cert: true               # local self-signed certificate only
       threads: 4
+    prod:
+      type: sqlserver
+      driver: 'ODBC Driver 18 for SQL Server'
+      server: 'YOUR-PC\SQLEXPRESS'
+      database: DataWarehouse
+      schema: dbo                    # only for objects without a custom schema (none today)
+      windows_login: true
+      encrypt: true
+      trust_cert: true
+      threads: 4
 ```
+
+The target decides where each layer is built
+([`macros/generate_schema_name.sql`](macros/generate_schema_name.sql)):
+
+| Target | Silver | Gold | Snapshots | Failing test rows |
+|---|---|---|---|---|
+| `prod` | `silver` | `gold` | `snapshots` | `dbt_test__audit` |
+| `dev` | `dbt_dev_silver` | `dbt_dev_gold` | `dbt_dev_snapshots` | `dbt_dev_dbt_test__audit` |
+
+The default target is `dev`, so nothing reaches the official schemas without
+writing `--target prod`. Sources take the database from the target, so the
+same project can be built on a copy of the database (see
+[Migration and cutover](#migration-and-cutover)).
 
 Check the setup from the project folder:
 
 ```powershell
 cd data_warehouse
-dbt debug            # ends with "All checks passed!"
-dbt deps             # installs the packages pinned in package-lock.yml
+dbt debug --target prod   # ends with "All checks passed!"
+dbt deps                  # installs the packages pinned in package-lock.yml
 ```
 
 ---
@@ -95,19 +114,19 @@ dbt deps             # installs the packages pinned in package-lock.yml
 Every dbt command runs from `data_warehouse/` with `.venv-dbt` active.
 
 ```powershell
-dbt build                                   # build and test everything, in DAG order
+dbt build --target prod                     # build and test everything in production, in DAG order
+dbt build                                   # the same in the dev schemas
 dbt build --select crm_cust_info+           # one model and everything downstream of it
 dbt build --select +fact_sales              # one model and everything upstream of it
-dbt test  --select test_name:parity_with    # only the parity checks
 dbt build --vars "{reference_date: '2027-06-16'}"   # rebuild as of another date
 dbt snapshot                                # only the snapshots (dbt build runs them too)
 dbt retry                                   # rerun only what failed or was skipped in the last run
 ```
 
-Expected result of `dbt build` with the included dataset: **110 nodes
-(11 models, 3 snapshots, 93 tests, 3 exposures), `PASS=106 WARN=1 NO-OP=3`**. Exposures
-run nothing: they are `NO-OP` when everything upstream of them succeeded, and
-`SKIP` when something upstream failed. The warning is
+Expected result of `dbt build` with the included dataset: **100 nodes
+(11 models, 3 snapshots, 83 tests, 3 exposures), `PASS=96 WARN=1 NO-OP=3`**.
+Exposures run nothing: they are `NO-OP` when everything upstream of them
+succeeded, and `SKIP` when something upstream failed. The warning is
 `assert_crm_sales_details_amounts_consistent` with 3 rows: the three sales
 that have neither `sales` nor `price` in the source and cannot be rebuilt
 (SO54036, SO54051, SO54139). A fourth one turns the warning into an error.
@@ -116,8 +135,12 @@ The run also prints a warning about the behavior flag
 (see [Design decisions](#design-decisions)), and dbt warns on every run while
 a behavior flag keeps its old value.
 
-Rows that fail a test are stored in the schema `dbt_dev_dbt_test__audit`; the
+Rows that fail a test are stored in the audit schema of the target; the
 command output prints the query to read them.
+
+The snapshots record a change only when dbt runs, so how often production is
+built sets the resolution of the customer history. A regular run is two
+steps: the Bronze load, then `dbt build --target prod`.
 
 dbt never drops a relation that the project no longer declares (a renamed or
 deleted model, or the leftovers of an interrupted run). To find them in the
@@ -127,6 +150,10 @@ dev schemas, and drop them once reviewed:
 dbt run-operation list_orphan_relations                          # list only
 dbt run-operation list_orphan_relations --args "{dry_run: false}" # drop (dev target only)
 ```
+
+The macro only looks at the schemas of the target, and refuses to drop
+anything outside `dev`: the production schemas also hold objects that dbt
+does not build, such as the report views of the analysis repository.
 
 Documentation site (see [Documentation](#documentation)):
 
@@ -149,8 +176,6 @@ data_warehouse/
 │   ├── _exposures.yml         # Consumers of Gold outside dbt (analysis repository)
 │   ├── bronze/
 │   │   └── _bronze__sources.yml   # Bronze tables as sources (loaded outside dbt)
-│   ├── legacy/
-│   │   └── _legacy__sources.yml   # Legacy silver/gold, only for the parity tests
 │   ├── silver/                # 6 models, materialized as tables
 │   │   └── _silver__models.yml    # Descriptions and generic tests of Silver
 │   ├── gold/                  # 5 models (star schema + 2 history dimensions), materialized as views
@@ -161,16 +186,15 @@ data_warehouse/
 ├── snapshots/
 │   └── _snapshots.yml         # 3 snapshots: type 2 history of the CRM and ERP customer tables
 ├── macros/
-│   ├── get_column_list.sql    # Column list of a relation (used by the parity test)
+│   ├── generate_schema_name.sql   # Schema names per target: silver in prod, dbt_dev_silver in dev
 │   └── list_orphan_relations.sql  # run-operation: list or drop relations no model declares
 └── tests/
     ├── generic/
-    │   ├── test_parity_with.sql        # dbt model vs legacy relation
     │   ├── test_no_untrimmed_values.sql # Leading or trailing spaces in text
     │   └── test_one_current_version.sql # At most one current version per key in a snapshot
     ├── bronze/                # Singular test on a source
     ├── silver/                # Singular tests: business rules of Silver
-    └── gold/                  # Singular tests: fact table vs Silver and legacy, history dimensions
+    └── gold/                  # Singular tests: fact table vs Silver, history dimensions, version keys
 ```
 
 ### Models
@@ -187,12 +211,11 @@ data_warehouse/
 
 Model and column names are the same as in the T-SQL warehouse, so the
 [analysis repository](https://github.com/Teovi13/sql-data-analysis-project)
-and [`docs/data_catalog.md`](../docs/data_catalog.md) keep working after the
-cutover. One deliberate difference: `customer_key` and `product_key` are hashes
-of the business keys (`varchar(32)`) instead of `ROW_NUMBER()` values (`bigint`),
-so consumers that store or type these keys need updating at the cutover.
-`fact_sales` also has two columns that the legacy view does not have,
-`product_version_key` and `customer_version_key` (see [History](#history-type-2)).
+kept working after the cutover. One deliberate difference: `customer_key`
+and `product_key` are hashes of the business keys (`varchar(32)`) instead of
+`ROW_NUMBER()` values (`bigint`). `fact_sales` also has two columns that the
+T-SQL view did not have, `product_version_key` and `customer_version_key`
+(see [History](#history-type-2)).
 
 ### Tests
 
@@ -201,32 +224,20 @@ so consumers that store or type these keys need updating at the cutover.
 | Generic, Silver | 25 | Primary keys and the keys used by the Gold joins (`unique`, `not_null`); domains of decoded columns (`accepted_values`); no leading or trailing spaces in key and name columns (`no_untrimmed_values`) |
 | Generic, Gold | 36 | Unique surrogate, version and business keys; attributes that must never be NULL; grain of `fact_sales` and of the history dimensions (`dbt_utils.unique_combination_of_columns`); one current version per product and customer (`unique` with `where: is_current = 1`); foreign keys of the fact table (`not_null` + `relationships`, because `relationships` skips NULL keys) |
 | Generic, snapshots | 9 | Unique version IDs (`dbt_scd_id`) and at most one current version per key (`one_current_version`) |
-| Parity | 9 | Each model against its legacy counterpart (see below) |
 | Singular, Bronze | 1 | No ties on the date that `crm_cust_info` uses to keep the latest record per customer |
 | Singular, Silver | 6 | Non-negative cost, date order and ranges, `sales = quantity × price` (with a threshold for the three known exceptions), birthdates in range |
-| Singular, Gold | 7 | Row count of `fact_sales` against Silver; every sale resolves to the same customer and product as in the legacy warehouse; product versions without gaps or overlaps and customer versions without overlaps; every dated sale finds exactly one product and one customer version; the version keys of a sale belong to its own product and customer |
+| Singular, Gold | 6 | Row count of `fact_sales` against Silver; product versions without gaps or overlaps and customer versions without overlaps; every dated sale finds exactly one product and one customer version; the version keys of a sale belong to its own product and customer |
 
 **Untrimmed text test.** `no_untrimmed_values` compares byte lengths
 (`DATALENGTH(col) <> DATALENGTH(TRIM(col))`). SQL Server pads strings with
-spaces before comparing them, so `col <> TRIM(col)` (the check in
-`tests/quality_checks_silver.sql`) and `LEN()` both miss trailing spaces.
+spaces before comparing them, so `col <> TRIM(col)` and `LEN()` both miss
+trailing spaces.
 
-**Parity test.** `parity_with` returns one row per difference between a dbt
-model and its legacy relation: rows only in dbt, rows only in the legacy
-relation, and one row when the row counts differ (`EXCEPT` ignores
-duplicates). Columns are read from the model at run time, so new columns are
-included automatically; load timestamps (`dwh_create_date`) are excluded.
-Text columns are compared with `COLLATE Latin1_General_BIN2`: the database
-collation is case-insensitive, and without it a change such as `'Yes'` to
-`'YES'` would pass unnoticed. Parity tests report but do not stop the build:
-they depend on the model and on a legacy source, so dbt does not use them as
-a gate for downstream models (quality tests on a single model do).
-
-In Gold, the surrogate keys are left out of the parity tests, because they are
-hashes in dbt and `ROW_NUMBER()` values in the legacy views. What they must
-still agree on is checked by `assert_fact_sales_keys_resolve_like_legacy`:
-each sale, resolved through the dimensions of its own warehouse, points to the
-same customer and product (business keys).
+**Tests as gates.** A test on a single model or snapshot stops everything
+built on top of it when it fails: if `crm_cust_info` fails a quality test, the
+snapshot does not record that data and nothing downstream is rebuilt. Tests
+that read two models (such as the row count of `fact_sales` against Silver)
+report but do not stop the build.
 
 ---
 
@@ -239,7 +250,7 @@ the attributes in force when it happened.
 
 | | Products | Customers |
 |---|---|---|
-| Where the history comes from | The CRM already keeps one row per product version (`prd_start_dt`), so `dim_products_history` is modeled from Silver: no snapshot | The CRM keeps only the current state, so `crm_cust_info_snapshot` captures every change from its first run (2026-11-06) |
+| Where the history comes from | The CRM already keeps one row per product version (`prd_start_dt`), so `dim_products_history` is modeled from Silver: no snapshot | The CRM keeps only the current state, so `crm_cust_info_snapshot` captures every change from its first production run (the cutover) |
 | Validity period | Whole days, both ends inclusive: each version ends the day before the next starts (`BETWEEN`) | `datetime2`, half-open: each version ends at the instant the next starts (`valid_from <= t < valid_to`) |
 | Gaps between versions | Never (tested) | Allowed: a customer missing from the source has no current version while it is missing (`hard_deletes: invalidate`) |
 | Keys | `product_key`, the same as in `dim_products`, equal in every version; `product_version_key`, hash of the product number and the start date | `customer_key`, the same as in `dim_customers`; `customer_version_key`, hash of the customer ID and the moment the snapshot captured the version |
@@ -272,17 +283,18 @@ stays NULL.
 
 ## Documentation
 
-Every model and column has a description, written next to its tests in
-`_silver__models.yml` and `_gold__models.yml`. Texts shared by several columns
-are written once as doc blocks in `models/docs/_shared__docs.md` (the load
-timestamp, the `'n/a'` convention, the two surrogate keys, the snapshot
-columns and the date used to pick a version) and inserted
-with `{{ doc('...') }}`; `models/docs/overview.md` is the home page of the
-site. The site shows each model with its columns, types, tests and SQL, and
-the lineage graph from the Bronze sources to the exposures.
+Every model, snapshot and column has a description, written next to its
+tests in `_silver__models.yml`, `_gold__models.yml` and `_snapshots.yml`.
+Texts shared by several columns are written once as doc blocks in
+`models/docs/_shared__docs.md` (the load timestamp, the `'n/a'` convention,
+the two surrogate keys, the snapshot columns and the date used to pick a
+version) and inserted with `{{ doc('...') }}`; `models/docs/overview.md` is
+the home page of the site. The site shows each model with its columns, types,
+tests and SQL, and the lineage graph from the Bronze sources to the
+exposures. It is the data dictionary of Silver and Gold.
 
-**Descriptions in SQL Server.** `persist_docs`, set for every model and snapshot in
-`dbt_project.yml`, writes the descriptions into the database as
+**Descriptions in SQL Server.** `persist_docs`, set for every model and
+snapshot in `dbt_project.yml`, writes the descriptions into the database as
 `MS_Description` extended properties each time a model is built. They are
 visible in SSMS (object Properties → Extended Properties) and in any tool
 that reads them:
@@ -297,14 +309,13 @@ LEFT JOIN sys.columns AS c
     ON c.object_id = ep.major_id
    AND c.column_id = ep.minor_id
 WHERE ep.name = 'MS_Description'
-  AND OBJECT_SCHEMA_NAME(ep.major_id) IN ('dbt_dev_silver', 'dbt_dev_gold', 'dbt_dev_snapshots')
+  AND OBJECT_SCHEMA_NAME(ep.major_id) IN ('silver', 'gold', 'snapshots')
 ORDER BY schema_name, object_name, ep.minor_id;
 ```
 
 With the current project it returns 130 rows: 11 models and 101 of their
-columns, and 3 snapshots and 15 of their columns. The
-descriptions are stored as plain text, so Markdown (backticks, bold) appears
-as typed.
+columns, and 3 snapshots and 15 of their columns. The descriptions are
+stored as plain text, so Markdown (backticks, bold) appears as typed.
 
 **Exposures.** [`models/_exposures.yml`](models/_exposures.yml) declares the
 consumers of Gold that live outside dbt: the two report views and the
@@ -315,9 +326,6 @@ change affects:
 ```powershell
 dbt ls --select dim_customers+ --resource-type exposure
 ```
-
-Until the cutover those consumers still read the legacy `gold` views, not the
-dbt models.
 
 ---
 
@@ -342,6 +350,15 @@ used: its overrides are named for the Fabric adapter, which dbt-sqlserver
 - **Silver as tables, Gold as views**, as in the T-SQL warehouse. Silver
   holds the heavy logic and is read by several Gold views; Gold views always
   reflect the last Silver build.
+- **One project, two targets.** `generate_schema_name` uses the custom
+  schema as is in `prod` (and in `rehearsal`, the target used to rehearse the
+  cutover on a copy) and prefixes it with the target schema anywhere else, so
+  development can never write to the official layers. dbt's own
+  `generate_schema_name_for_env` was not used: outside production it puts
+  every model in a single schema.
+- **Sources do not name a database**, so they read Bronze from the database
+  of the target: the same project builds the real warehouse or a restored
+  copy of it.
 - **No clustered columnstore in Silver** (`as_columnstore: false`): the
   adapter's default pays off on millions of rows, not on this dataset.
 - **Types are set with `cast`.** Without DDL, a column takes the type of its
@@ -351,8 +368,7 @@ used: its overrides are named for the Fabric adapter, which dbt-sqlserver
   the `DEFAULT GETDATE()` of the DDL.
 - **Documentation lives with the code.** Descriptions sit next to the tests
   of each model, are versioned with it and are written into SQL Server on
-  every build. Until the cutover, [`docs/data_catalog.md`](../docs/data_catalog.md)
-  remains the dictionary of the official Gold views.
+  every build.
 - **Surrogate keys are hashes of the business keys**
   (`dbt_utils.generate_surrogate_key`: MD5 of `cst_id` and of the product
   number). A key depends only on its own customer or product, so it never
@@ -376,20 +392,68 @@ used: its overrides are named for the Fabric adapter, which dbt-sqlserver
   automatically** (`flags.dbt_sqlserver_enable_safe_type_expansion: false`):
   on a table that cannot be rebuilt, such a change in Silver must be
   reviewed.
-- **Logic kept identical to the T-SQL procedures** until the cutover, so
-  parity can prove the migration. Known quirks are documented in the models
-  (integer division of `sls_price`, exact in every current row and caught by
-  the amounts test if it ever is not).
+- **Logic inherited from the T-SQL procedures.** The models reproduce the
+  T-SQL logic exactly, quirks included, because parity with it was the proof
+  of the migration. Known quirks are documented in the models (integer
+  division of `sls_price`, exact in every current row and caught by the
+  amounts test if it ever is not).
+
+---
+
+## Migration and cutover
+
+The layers were first built by T-SQL scripts (`silver.load_silver` and the
+Gold view definitions). The migration ran both warehouses side by side:
+
+1. **Parity.** dbt built into the dev schemas, and a parity test compared
+   every dbt model with its T-SQL counterpart on each build, row by row and
+   with binary text comparison, until every model matched.
+2. **Rehearsal.** The database was backed up and restored as
+   `DataWarehouse_rehearsal`, and the whole cutover was run there with a
+   `rehearsal` target: dbt replaced the T-SQL tables and views of the copy,
+   the report views of the analysis repository were refreshed, and the Gold
+   of the copy was compared with the T-SQL Gold of the real database.
+3. **Cutover.** On the real database: row counts recorded, a verified backup,
+   `dbt build --target prod`, the dependent views refreshed, the row counts
+   compared, and `silver.load_silver` dropped. The parity tests and the legacy
+   sources were removed, since they would have compared each model with
+   itself.
+
+**Views that read Gold.** The report views of the analysis repository are not
+built by dbt and are not schema-bound, so SQL Server keeps their old column
+metadata when the Gold views change. After a change in the columns or types
+of Gold, refresh them:
+
+```sql
+EXEC sp_refreshview N'gold.report_customers';
+EXEC sp_refreshview N'gold.report_products';
+```
+
+To list every object that reads Silver or Gold:
+
+```sql
+SELECT DISTINCT OBJECT_SCHEMA_NAME(referencing_id) AS dependent_schema,
+       OBJECT_NAME(referencing_id) AS dependent_object
+FROM sys.sql_expression_dependencies
+WHERE referenced_schema_name IN ('silver', 'gold');
+```
+
+**Rolling back.** Silver and Gold derive from Bronze, so the T-SQL version
+can always be rebuilt from the git tag `pre-dbt-cutover`, which holds the
+last commit where the T-SQL scripts were the official build
+(`scripts/silver/ddl_silver.sql`, `scripts/silver/proc_load_silver.sql`,
+`scripts/gold/ddl_gold.sql`). A rebuild cannot recover the snapshot history
+nor `bronze.load_log`: they are kept by the database backups.
 
 ---
 
 ## Known limitations
 
-- **Customer history starts on 2026-11-06**, the first snapshot run, and
-  has the resolution of the runs: `dbt_valid_from` is the run that detected a
-  change, and two changes between runs are recorded as one. The development
-  snapshot also keeps changes simulated while building it (customers 34 and
-  12); the production snapshot will start clean.
+- **Customer history starts with the first production run** (the cutover),
+  and has the resolution of the runs: `dbt_valid_from` is the run that
+  detected a change, and two changes between runs are recorded as one. The
+  development snapshot also keeps changes simulated while building it
+  (customers 34 and 12); the production snapshot started clean.
 - **The ERP attributes of `dim_customers_history` are not historized yet.**
   Country, birthdate and the ERP gender are the current values in every
   version; their snapshots already collect history, to be combined with the
@@ -399,13 +463,6 @@ used: its overrides are named for the Fabric adapter, which dbt-sqlserver
   collation.
 - **Two time zones.** Snapshot timestamps come from `SYSDATETIME()` (server
   local time); `reference_date` and the dbt logs use the run start in UTC.
-- **Trailing spaces are not compared by the parity test.** SQL Server
-  ignores trailing spaces in comparisons under any collation, including the
-  binary one. `no_untrimmed_values` covers the key and name columns of
-  Silver; other text columns are not checked.
-- **Parity needs matching column types.** If a column changes type between a
-  model and its legacy relation, `parity_with` stops with a SQL Server error
-  (an invalid `COLLATE` or a failed conversion) instead of listing rows.
 - **Hashes of non-Latin text.** On SQL Server, `generate_surrogate_key` casts
   values to `varchar` before hashing, so characters outside the code page
   become `?`. The current business keys are numbers and ASCII codes.
@@ -427,12 +484,13 @@ used: its overrides are named for the Fabric adapter, which dbt-sqlserver
   creation date, the choice would be arbitrary; the Bronze test stops the
   build instead. The lasting fix is a source row number from the ingestion
   layer.
+- **Runs are manual.** Nothing schedules the Bronze load and the dbt build
+  yet.
 
 ---
 
 ## Next steps
 
-Combine the ERP snapshots with the CRM history in `dim_customers_history`;
-and the cutover: a `prod` target that builds into `silver`, `gold` and
-`snapshots`, retirement of the T-SQL procedures and of the parity tests, and
-the dbt documentation as the only data dictionary of Gold.
+Schedule the Bronze load and `dbt build --target prod` with an orchestrator;
+and combine the ERP snapshots with the CRM history in
+`dim_customers_history`.

@@ -86,10 +86,12 @@ The Gold objects are views, not tables, but they follow the same rule.
 - All stored procedures used for loading data must follow the naming pattern:
 - **`load_<layer>`**, created in the schema of the layer it loads.
 
-  - `<layer>`: Represents the layer being loaded, `bronze` or `silver`. The Gold layer has no loading procedure because its objects are views over Silver.
+  - `<layer>`: Represents the layer being loaded.
   - Example:
     - `bronze.load_bronze` → Stored procedure for loading data into the Bronze layer.
-    - `silver.load_silver` → Stored procedure for loading data into the Silver layer.
+  - Silver and Gold have no loading procedure: they are built by dbt. The
+    procedure `silver.load_silver` existed until the cutover to dbt and is
+    kept in the git tag `pre-dbt-cutover`.
 
 ## **Python Ingestion Layer**
 
