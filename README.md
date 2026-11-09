@@ -1,14 +1,20 @@
 # SQL Data Warehouse Project
 
-A data warehouse built in **SQL Server (T-SQL)** following the **Medallion
+A data warehouse built on **SQL Server** following the **Medallion
 Architecture (Bronze → Silver → Gold)**. It integrates data from two source
-systems (CRM and ERP) into a dimensional star schema, ready for analytical
-queries and BI reporting.
+systems (CRM and ERP) into a dimensional star schema with type 2 history,
+ready for analytical queries and BI reporting. Bronze is loaded by a Python
+ingestion layer; Silver and Gold are built and tested by **dbt**.
 
 Portfolio project built as part of my path into **Data Engineering**,
 applying ETL, dimensional modeling, and data quality engineering on top of
 SQL Server. The repository is fully self-contained and reproducible end to
-end — clone it, run the scripts in order, and query a working star schema.
+end — clone it, load Bronze, run `dbt build`, and query a working star schema.
+
+The Silver and Gold layers were first built with T-SQL scripts and stored
+procedures, then migrated to dbt with a parity test that compared every model
+with its T-SQL counterpart on each build. The T-SQL version is kept in the
+git tag [`pre-dbt-cutover`](https://github.com/Teovi13/sql-data-warehouse-project/tree/pre-dbt-cutover).
 
 ---
 
@@ -22,10 +28,11 @@ layers that progressively refine the data:
 | Layer | Purpose | Object type | Transformations |
 |---|---|---|---|
 | **Bronze** | Raw data, exactly as it arrives from the sources (CRM/ERP) | Tables | None (raw load with the [Python ingestion layer](#python-ingestion-layer) or `BULK INSERT`) |
-| **Silver** | Cleaned and standardized data | Tables | Cleansing, standardization, derived columns, type casting |
-| **Gold** | Business-ready data, modeled as a star schema | Views | Integration, business logic |
+| **Silver** | Cleaned and standardized data | Tables (dbt models) | Cleansing, standardization, derived columns, type casting |
+| **Gold** | Business-ready data, modeled as a star schema with history | Views (dbt models) | Integration, business logic, type 2 history |
+| **Snapshots** | Change history of the sources that keep only their current state | Tables (dbt snapshots) | None: each run records what changed since the previous one |
 
-**End-to-end flow:** Sources (CSV) → Bronze → Silver → Gold → SQL Queries / BI
+**End-to-end flow:** Sources (CSV) → Bronze (Python ingestion) → Silver → Gold (dbt) → SQL Queries / BI
 
 The SQL analysis built on top of the Gold layer lives in a separate repository:
 [sql-data-analysis-project](https://github.com/Teovi13/sql-data-analysis-project).
@@ -50,12 +57,13 @@ underlying source systems, for example:
 - How does average order value differ by customer segment (country,
   marital status)?
 
-A fourth kind of question, *which products have been discontinued or
-replaced, and when?*, is answered from Silver, not from Gold:
-`silver.crm_prd_info` keeps every version of each product, while
-`gold.dim_products` shows only the current one (see **Technical highlights**
-below). Keeping that history is a detail most tutorial-level warehouses skip
-entirely.
+A fourth kind of question needs history: *which products have been
+replaced, and what did each sale look like when it happened?*
+`gold.dim_products_history` keeps every version of each product,
+`gold.dim_customers_history` every captured change of each customer, and
+each row of `gold.fact_sales` points both to the current product and
+customer and to the versions in force on the sale (see
+[History](data_warehouse/README.md#history-type-2)).
 
 ---
 
@@ -63,12 +71,12 @@ entirely.
 
 **Requirements**
 
-- **SQL Server** and **SSMS** (or Azure Data Studio), on **Windows**.
-- Only for the Python option of step 2: **Python 3.11 or later**, the
-  [Microsoft ODBC Driver 18 for SQL Server](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server),
-  and Windows authentication on your SQL Server (the layer connects as the
-  current Windows user; SQL logins are not supported). The `BULK INSERT`
-  option needs none of this.
+- **SQL Server 2017 or later** and **SSMS** (or Azure Data Studio), on **Windows**.
+- **Python 3.11 or later** and the
+  [Microsoft ODBC Driver 18 for SQL Server](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server):
+  dbt (step 3) needs them, and so does the Python option of step 2.
+- Windows authentication on your SQL Server: the Python layer and the dbt
+  profile below connect as the current Windows user.
 
 The sample dataset is included in the repo, so the pipeline runs right after
 cloning it:
@@ -81,15 +89,18 @@ cd sql-data-warehouse-project
 > **Running the SQL scripts**
 > - Run each script **in full**: press F5 with no text selected, because SSMS
 >   executes only the selected text if there is any.
-> - Every script after step 1 starts with `USE DataWarehouse;`, so it does not
+> - Every Bronze script starts with `USE DataWarehouse;`, so it does not
 >   matter which database the query window had selected.
 
 1. **Create the database and schemas**
 
    Run `scripts/init_database.sql`. It creates the `DataWarehouse` database
-   and the three schemas: `bronze`, `silver`, `gold`.
-   > If a database named `DataWarehouse` already exists, this script **drops
-   > it and creates it again**: everything in it is lost.
+   and the schemas `bronze`, `silver` and `gold`, each only if it does not
+   exist yet, so running it again changes nothing.
+   > The script never drops the database: once dbt has run, it holds history
+   > that cannot be rebuilt from the CSV files (the snapshots, and
+   > `bronze.load_log`). To start from scratch, drop it by hand, knowing that
+   > this history is lost.
 
 2. **Create the Bronze tables and load them**
 
@@ -131,26 +142,36 @@ cd sql-data-warehouse-project
    it is not transactional: a table whose load fails is left empty, because it
    was already truncated.
 
-3. **Create the tables and load the Silver layer**
+3. **Build Silver and Gold with dbt**
 
-   Run these two scripts, in this order:
-   - `scripts/silver/ddl_silver.sql` creates the Silver tables.
-   - `scripts/silver/proc_load_silver.sql` only **creates** the procedure
-     `silver.load_silver`; it loads nothing yet.
-
-   Then execute the procedure, which fills the Silver tables from Bronze:
-   ```sql
-   EXEC silver.load_silver;
+   dbt gets its own virtual environment, separate from the one of the Python
+   layer. From the repository root, in PowerShell:
+   ```powershell
+   py -3.13 -m venv .venv-dbt
+   .venv-dbt\Scripts\Activate.ps1
+   python -m pip install -r requirements-dbt.txt
    ```
+   Create `%USERPROFILE%\.dbt\profiles.yml` (outside the repository) with a
+   `prod` output; the full example, with a `dev` output for development, is
+   in [`data_warehouse/README.md`](data_warehouse/README.md#setup). Then, from
+   `data_warehouse/`:
+   ```powershell
+   cd data_warehouse
+   dbt debug --target prod      # ends with "All checks passed!"
+   dbt deps                     # installs dbt_utils
+   dbt build --target prod      # builds and tests Silver, Gold and the snapshots
+   ```
+   The build creates the Silver tables, the Gold views and the snapshots in
+   dependency order, and runs every data test right after the model it
+   checks. With the included dataset it ends with
+   `PASS=96 WARN=1 ERROR=0 NO-OP=3 TOTAL=100`. The warning is expected: three
+   sales have neither an amount nor a price in the source, so Silver cannot
+   rebuild them (see [About the dataset](#about-the-dataset)).
 
-4. **Create the Gold layer views**
+4. **Validate the result**
 
-   Run `scripts/gold/ddl_gold.sql`. Gold is made of views, so there is
-   nothing to load: they read Silver every time they are queried.
-
-5. **Validate the result**
-
-   First check the row count of every table:
+   Every quality check already ran as a dbt test in step 3. To see the row
+   count of every table:
    ```sql
    USE DataWarehouse;
 
@@ -177,43 +198,48 @@ cd sql-data-warehouse-project
 
    `crm_cust_info` shrinks from 77 to 70 because Silver drops the row without
    a customer id and keeps only the latest record of each duplicated customer.
-   The Gold views will return 70 rows in `gold.dim_customers`, 25 in
-   `gold.dim_products` (one per product, the current version) and 220 in
-   `gold.fact_sales`.
+   The snapshots start with one row per key: 70 in
+   `snapshots.crm_cust_info_snapshot`, 63 in `snapshots.erp_loc_a101_snapshot`
+   and 59 in `snapshots.erp_cust_az12_snapshot`. The Gold views return 70 rows
+   in `gold.dim_customers`, 25 in `gold.dim_products` (one per product, the
+   current version), 32 in `gold.dim_products_history`, 70 in
+   `gold.dim_customers_history` and 220 in `gold.fact_sales`.
 
-   Then run the data quality checks, one script per layer:
-   - `tests/quality_checks_silver.sql`
-   - `tests/quality_checks_gold.sql`
-
-   With the included dataset, every check returns **0 rows** except one: the
-   sales consistency check of `quality_checks_silver.sql` returns **2 rows**,
-   sales that have neither an amount nor a price in the source, so Silver
-   cannot reconstruct them (see [About the dataset](#about-the-dataset)). The
-   checks that end in `SELECT DISTINCT` are not pass/fail: they list the
-   values of a column (marital status, product line, gender, country,
-   maintenance) so you can read them.
-
-6. **Query the Gold layer**
+5. **Query the Gold layer**
    ```sql
    SELECT * FROM gold.dim_customers;
    SELECT * FROM gold.dim_products;
    SELECT * FROM gold.fact_sales;
+   SELECT * FROM gold.dim_products_history;
+   SELECT * FROM gold.dim_customers_history;
    ```
+
+   From then on, each new load is two commands: the Bronze load of step 2 and
+   `dbt build --target prod`. The snapshots record changes only when dbt
+   runs, so how often it runs sets the resolution of the customer history.
 
 ---
 
 ## Data model (Gold Layer)
 
-The Gold layer exposes a simple **star schema**: two dimensions and one
-fact table.
+The Gold layer exposes a **star schema**: two dimensions and one fact
+table, plus a history dimension for each of them.
 
 ![Star Schema](docs/star_schema.png)
 
-- **`gold.dim_customers`** — customer dimension (CRM + ERP combined)
-- **`gold.dim_products`** — product dimension (active versions only)
+- **`gold.dim_customers`** — customer dimension (CRM + ERP combined), current state
+- **`gold.dim_products`** — product dimension, current version of each product
 - **`gold.fact_sales`** — sales facts, one record per product line sold
+- **`gold.dim_customers_history`**, **`gold.dim_products_history`** — one row
+  per version, with its validity period. Each sale carries a version key for
+  each of them, next to the keys of the current dimensions.
 
-Full column-by-column data dictionary: [`docs/data_catalog.md`](docs/data_catalog.md)
+The diagram shows the star schema as first designed, with integer surrogate
+keys; dbt builds them as MD5 hashes of the business keys and adds the history
+dimensions.
+
+Column-by-column documentation: the dbt documentation site and SQL Server
+itself (see [`docs/data_catalog.md`](docs/data_catalog.md)).
 
 Naming conventions used throughout the project: [`docs/naming_conventions.md`](docs/naming_conventions.md)
 
@@ -239,19 +265,19 @@ through already-clean data:
 | Negative or missing prices | `sales_details.csv` | Recalculated from `sales / quantity` |
 | Inconsistent `sales` vs. `quantity × price` | `sales_details.csv` | Recalculated to restore consistency |
 | Duplicate customer records (different load dates) and one record without `cst_id` | `cust_info.csv` | De-duplicated, keeping the most recent record; the record without id is discarded |
-| Multiple versions of the same product | `prd_info.csv` | Full version history kept in Silver; only the current version surfaced in Gold |
+| Multiple versions of the same product | `prd_info.csv` | Full version history kept in Silver and in `gold.dim_products_history`; `gold.dim_products` shows the current version |
 | Inconsistent codes and spellings (`'S'`/`'Single'`, `'DE'`/`'Germany'`, `'US'`/`'USA'`, `'m'`/`'M'`) | multiple files | Standardized to consistent business-friendly values |
 | Untrimmed and inconsistent `maintenance` flags (`' No'`, `' Yes '`, `'yes'`) | `PX_CAT_G1V2.csv` | Trimmed and standardized to `'Yes'` / `'No'` |
 | Negative product costs | `prd_info.csv` | Treated as unknown, like a missing cost: set to `0` |
 | Birth dates in the future | `CUST_AZ12.csv` | Set to `NULL` |
-| Sales with neither `sales` nor `price` | `sales_details.csv` | Nothing to recalculate from: kept as `NULL` and reported by the quality check |
+| Sales with neither `sales` nor `price` | `sales_details.csv` | Nothing to recalculate from: kept as `NULL` and reported by a dbt test as a warning |
 | `NAS`-prefixed and dash-formatted customer IDs | ERP files | Stripped/normalized to match the CRM business key |
 
 Only one of these defects survives Silver, because there is nothing to rebuild
-it from: the sales with neither `sales` nor `price`. They are three sales;
-the sales consistency check of `tests/quality_checks_silver.sql` shows them
-as 2 rows because two of them have the same values and the check uses
-`SELECT DISTINCT`.
+it from: the sales with neither `sales` nor `price`. They are three sales
+(SO54036, SO54051, SO54139), and the dbt test
+`assert_crm_sales_details_amounts_consistent` reports them as a warning on
+every build; a fourth one would turn it into an error.
 
 ---
 
@@ -270,29 +296,21 @@ sql-data-warehouse-project/
 │       ├── LOC_A101.csv
 │       └── PX_CAT_G1V2.csv
 │
-├── scripts/                   # All SQL code for the pipeline
-│   ├── init_database.sql      # Creates the DataWarehouse database and schemas
-│   ├── bronze/
-│   │   ├── ddl_bronze.sql     # Bronze table definitions
-│   │   ├── ddl_load_log.sql   # bronze.load_log: load history written by the Python layer
-│   │   └── proc_load_bronze.sql   # Bronze load (BULK INSERT + logging)
-│   ├── silver/
-│   │   ├── ddl_silver.sql     # Silver table definitions
-│   │   └── proc_load_silver.sql   # ETL Bronze → Silver (cleansing/transformation)
-│   └── gold/
-│       └── ddl_gold.sql       # Gold views (star schema: dims + fact)
+├── scripts/                   # SQL scripts for the database and the Bronze layer
+│   ├── init_database.sql      # Creates the DataWarehouse database and schemas, if missing
+│   └── bronze/
+│       ├── ddl_bronze.sql     # Bronze table definitions
+│       ├── ddl_load_log.sql   # bronze.load_log: load history written by the Python layer
+│       └── proc_load_bronze.sql   # Bronze load (BULK INSERT + logging)
 │
 ├── ingestion/                 # Python ingestion layer, with its own README
 │
-├── data_warehouse/            # dbt project for Silver and Gold (in progress), with its own README
+├── data_warehouse/            # dbt project: Silver, Gold, snapshots and data tests, with its own README
 │
-├── tests/                     # Data quality checks (SQL) and unit tests (pytest)
-│   ├── quality_checks_silver.sql
-│   ├── quality_checks_gold.sql
-│   └── test_*.py              # Unit tests of the ingestion layer (no database needed)
+├── tests/                     # Unit tests of the ingestion layer (pytest, no database needed)
 │
 ├── docs/                      # Documentation and diagrams
-│   ├── data_catalog.md        # Data dictionary for the Gold layer
+│   ├── data_catalog.md        # Where the documentation lives, and bronze.load_log
 │   ├── naming_conventions.md  # Naming conventions used throughout the project
 │   ├── data_architecture.drawio / .png
 │   ├── data_flow.drawio / .png
@@ -437,34 +455,38 @@ limitations of the layer are in [`ingestion/README.md`](ingestion/README.md).
 
 ---
 
-## dbt transformation layer (in progress)
+## dbt transformation layer
 
-The Silver and Gold layers are being migrated to a [dbt](https://docs.getdbt.com/)
-project in [`data_warehouse/`](data_warehouse/): one `SELECT` per model, built
-in dependency order, with 93 data tests and a parity test that compares every
-dbt model with its T-SQL counterpart on each build. Every model and column is
-documented, with a browsable site (`dbt docs`) and the descriptions written
-into SQL Server, where SSMS shows them. It adds type 2 history: product
-versions from the CRM, customer changes captured by dbt snapshots, and a fact
-table that points to the version in force on each sale. During the migration
-dbt builds into its own schemas (`dbt_dev_silver`, `dbt_dev_gold`,
-`dbt_dev_snapshots`), and the T-SQL
-scripts above remain the official way to build Silver and Gold. Setup and
-details in [`data_warehouse/README.md`](data_warehouse/README.md).
+Silver and Gold are a [dbt](https://docs.getdbt.com/) project in
+[`data_warehouse/`](data_warehouse/): one `SELECT` per model, built in
+dependency order, with 83 data tests that stop the models built on top of a
+failing one. Every model and column is documented, with a browsable site
+(`dbt docs`) and the descriptions written into SQL Server, where SSMS shows
+them. It adds type 2 history: product versions from the CRM, customer changes
+captured by dbt snapshots, and a fact table that points to the version in
+force on each sale.
+
+The layers were first built by T-SQL scripts. The migration ran both versions
+side by side, with a parity test comparing every dbt model with its T-SQL
+counterpart on each build, and ended with a cutover rehearsed on a restored
+copy of the database; the T-SQL scripts are kept in the git tag
+`pre-dbt-cutover`. Setup, commands and design decisions in
+[`data_warehouse/README.md`](data_warehouse/README.md).
 
 ---
 
 ## Technical highlights
 
 - **Strict layer separation**, each with its own schema and single responsibility
-- **Stored procedures with logging and error handling** (`TRY/CATCH` that prints the error and re-raises it, per-table duration `PRINT`) in the Bronze and Silver loads
+- **dbt for Silver and Gold**: version-controlled `SELECT` models built in dependency order, each table swapped in only once it is complete, and 83 data tests that stop the models built on top of a failing one
 - **Data reconciliation in Silver**: cleansing of dates stored as `INT`, recalculating price/sales when the source data is inconsistent, respecting the dependency order between calculated columns
-- **Slowly Changing Dimension** for products: `silver.crm_prd_info` keeps the full version history of each product (`prd_start_dt`/`prd_end_dt` computed with `LEAD`), and `gold.dim_products` filters down to the current version only
-- **Surrogate keys** generated with `ROW_NUMBER()` in the Gold dimensions, decoupling business keys from warehouse keys
-- **Automated quality checks** for key uniqueness, referential integrity between the fact table and its dimensions, and data consistency (`sales = quantity × price`)
+- **Type 2 history**: product versions modeled from the CRM (whole-day validity, no gaps or overlaps, tested), customer changes captured by dbt snapshots (half-open `datetime2` validity), and a fact table with durable and version keys, so each sale can be reported with the current attributes or with those in force when it happened
+- **Surrogate keys** as hashes of the business keys, so a key never shifts when other rows are added
+- **Automated quality checks** as dbt tests: key uniqueness, referential integrity between the fact table and its dimensions, data consistency (`sales = quantity × price`), and the integrity of the history (one current version per key, every sale resolving to exactly one version)
+- **A migration with proof**: the T-SQL and dbt versions ran side by side with a parity test on every build, and the cutover was rehearsed on a restored copy of the database before touching the real one
 - **Python ingestion layer** (pandas + SQLAlchemy/pyodbc) as an alternative to `BULK INSERT` in Bronze: validation rules, strict type conversion, one transaction per table with row-count reconciliation, a persistent load history (`bronze.load_log`) and exit codes that a scheduler can act on
 - **Unit-tested without a database**: a pytest suite for the Python layer, plus pycodestyle, pydocstyle and pylint checks
-- **Self-contained and reproducible**: a synthetic dataset ships with the repo (see [About the dataset](#about-the-dataset)), so the entire pipeline can be run end to end with the SQL scripts alone, with no external dependency
+- **Self-contained and reproducible**: a synthetic dataset ships with the repo (see [About the dataset](#about-the-dataset)), so the entire pipeline can be run end to end on a local SQL Server, with no external service
 
 ---
 

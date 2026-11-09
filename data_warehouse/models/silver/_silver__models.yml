@@ -2,10 +2,10 @@
 # Models: Silver layer
 # =============================================================================
 # Purpose:
-#     Descriptions and generic data tests for the Silver models: parity with
-#     the legacy Silver tables, primary keys, the keys used by the Gold joins,
-#     untrimmed text, and the domains of the decoded columns. The business
-#     rules of crm_sales_details are singular tests in tests/silver/.
+#     Descriptions and generic data tests for the Silver models: primary keys,
+#     the keys used by the Gold joins, untrimmed text, and the domains of the
+#     decoded columns. The business rules of crm_sales_details are singular
+#     tests in tests/silver/.
 # =============================================================================
 
 models:
@@ -14,11 +14,6 @@ models:
       Customer master data from the CRM, one row per customer: the most
       recent record of each customer ID, with trimmed names and decoded
       marital status and gender.
-    data_tests:
-      - parity_with:
-          arguments:
-            legacy: source('legacy_silver', 'crm_cust_info')
-            exclude_columns: ['dwh_create_date']
     columns:
       - name: cst_id
         description: "CRM customer ID. Primary key."
@@ -61,11 +56,6 @@ models:
       Product versions from the CRM, one row per version: the product key is
       split into category ID and product number, invalid costs become 0, and
       each version ends the day before the next one starts.
-    data_tests:
-      - parity_with:
-          arguments:
-            legacy: source('legacy_silver', 'crm_prd_info')
-            exclude_columns: ['dwh_create_date']
     columns:
       - name: prd_id
         description: "CRM ID of the product version. Primary key: each new version of a product gets a new ID."
@@ -102,11 +92,6 @@ models:
       Sales lines from the CRM, one row per product within an order: integer
       dates become DATE, and sales and price are rebuilt when they are
       missing or inconsistent.
-    data_tests:
-      - parity_with:
-          arguments:
-            legacy: source('legacy_silver', 'crm_sales_details')
-            exclude_columns: ['dwh_create_date']
     columns:
       - name: sls_ord_num
         description: "Order number. Together with sls_prd_key, it identifies a sales line."
@@ -137,11 +122,6 @@ models:
       Customer demographics from the ERP: IDs without the NAS prefix,
       birthdates after the reference date set to NULL, and standardized
       gender.
-    data_tests:
-      - parity_with:
-          arguments:
-            legacy: source('legacy_silver', 'erp_cust_az12')
-            exclude_columns: ['dwh_create_date']
     columns:
       - name: cid
         description: "ERP customer ID without the NAS prefix, so it matches cst_key in crm_cust_info."
@@ -161,11 +141,6 @@ models:
 
   - name: erp_loc_a101
     description: "Customer location from the ERP: IDs without dashes and standardized country names."
-    data_tests:
-      - parity_with:
-          arguments:
-            legacy: source('legacy_silver', 'erp_loc_a101')
-            exclude_columns: ['dwh_create_date']
     columns:
       - name: cid
         description: "ERP customer ID without dashes, so it matches cst_key in crm_cust_info."
@@ -185,11 +160,6 @@ models:
 
   - name: erp_px_cat_g1v2
     description: "Product category reference from the ERP: category, subcategory and a standardized maintenance flag."
-    data_tests:
-      - parity_with:
-          arguments:
-            legacy: source('legacy_silver', 'erp_px_cat_g1v2')
-            exclude_columns: ['dwh_create_date']
     columns:
       - name: id
         description: "Category ID (for example BI_RO). Matches cat_id in crm_prd_info."

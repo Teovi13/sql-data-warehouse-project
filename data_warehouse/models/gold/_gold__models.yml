@@ -2,13 +2,11 @@
 # Models: Gold layer
 # =============================================================================
 # Purpose:
-#     Descriptions and generic data tests for the star schema: parity with the
-#     legacy Gold views (surrogate keys excluded: they are hashes in dbt,
-#     ROW_NUMBER values in the legacy views; tests/gold checks that they still
-#     resolve to the same customers and products), unique surrogate and
-#     business keys in the dimensions, attributes that must never be NULL, the
-#     grain of the fact table, and its foreign keys (not_null + relationships,
-#     because relationships alone skips NULL keys).
+#     Descriptions and generic data tests for the star schema and its history
+#     dimensions: unique surrogate, version and business keys, attributes that
+#     must never be NULL, the grain of each table, one current version per
+#     product and customer, and the foreign keys of the fact table (not_null +
+#     relationships, because relationships alone skips NULL keys).
 # =============================================================================
 
 models:
@@ -16,11 +14,6 @@ models:
     description: >
       Customer dimension, one row per customer. Combines the CRM identity
       data with the ERP demographics and location.
-    data_tests:
-      - parity_with:
-          arguments:
-            legacy: source('legacy_gold', 'dim_customers')
-            exclude_columns: ['customer_key']
     columns:
       - name: customer_key
         description: "{{ doc('customer_key') }}"
@@ -122,11 +115,6 @@ models:
     description: >
       Product dimension, one row per product: only the current version of
       each product, enriched with its ERP category.
-    data_tests:
-      - parity_with:
-          arguments:
-            legacy: source('legacy_gold', 'dim_products')
-            exclude_columns: ['product_key']
     columns:
       - name: product_key
         description: "{{ doc('product_key') }}"
@@ -226,10 +214,6 @@ models:
       dimension, and the version key joins the history dimension with the version
       in force on the sale.
     data_tests:
-      - parity_with:
-          arguments:
-            legacy: source('legacy_gold', 'fact_sales')
-            exclude_columns: ['customer_key', 'product_key', 'product_version_key', 'customer_version_key']
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: ['order_number', 'product_key']

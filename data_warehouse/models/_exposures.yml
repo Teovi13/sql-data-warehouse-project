@@ -19,8 +19,8 @@ exposures:
       View gold.report_customers, created by the analysis repository: one row per
       customer with segments (VIP, Regular, New), age groups and KPIs such as
       recency, average order value and average monthly spend. Joins fact_sales and
-      dim_customers on customer_key. Until the cutover it reads the legacy gold
-      schema, not the dbt models.
+      dim_customers on customer_key. Not schema-bound: refresh it with
+      sp_refreshview when the columns of those models change.
     depends_on:
       - ref('fact_sales')
       - ref('dim_customers')
@@ -36,8 +36,8 @@ exposures:
       View gold.report_products, created by the analysis repository: one row per
       product with revenue segments (High-Performer, Mid-Range, Low-Performer) and
       KPIs such as recency, average order revenue and average monthly revenue. Joins
-      fact_sales and dim_products on product_key. Until the cutover it reads the
-      legacy gold schema, not the dbt models.
+      fact_sales and dim_products on product_key. Not schema-bound: refresh it
+      with sp_refreshview when the columns of those models change.
     depends_on:
       - ref('fact_sales')
       - ref('dim_products')
@@ -53,7 +53,7 @@ exposures:
       Exploratory SQL scripts of the analysis repository (scripts 01 to 11):
       dimensions, dates, measures, magnitude, ranking, change over time, cumulative,
       part-to-whole, segmentation and performance analyses. Ad hoc queries, not
-      scheduled. Until the cutover they read the legacy gold schema.
+      scheduled.
     depends_on:
       - ref('dim_customers')
       - ref('dim_products')
