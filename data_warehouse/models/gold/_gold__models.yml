@@ -1,12 +1,12 @@
 # =============================================================================
 # Models: Gold layer
 # =============================================================================
-  # Purpose:
-  #     Descriptions and generic data tests for the star schema and its history
-  #     dimensions: unique surrogate, version and business keys, attributes that
-  #     must never be NULL, the grain of each table, one current version per
-  #     product and customer, and the foreign keys of the fact table (not_null +
-  #     relationships, because relationships alone skips NULL keys).
+# Purpose:
+#     Descriptions and generic data tests for the star schema and its history
+#     dimensions: unique surrogate, version and business keys, attributes that
+#     must never be NULL, the grain of each table, one current version per
+#     product and customer, and the foreign keys of the fact table (not_null +
+#     relationships, because relationships alone skips NULL keys).
 # =============================================================================
 
 models:

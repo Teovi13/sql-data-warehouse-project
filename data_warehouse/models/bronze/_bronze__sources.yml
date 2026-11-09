@@ -10,7 +10,6 @@
 sources:
   - name: bronze
     description: "Faithful copies of the CRM and ERP source files (CSV). Types are validated on load, but no cleansing is applied: that happens in Silver."
-    database: DataWarehouse
     schema: bronze
     loader: python ingestion layer (ingestion/)
     tables:

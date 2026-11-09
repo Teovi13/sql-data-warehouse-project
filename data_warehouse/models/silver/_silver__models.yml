@@ -1,11 +1,11 @@
 # =============================================================================
 # Models: Silver layer
 # =============================================================================
-  # Purpose:
-  #     Descriptions and generic data tests for the Silver models: primary keys,
-  #     the keys used by the Gold joins, untrimmed text, and the domains of the
-  #     decoded columns. The business rules of crm_sales_details are singular
-  #     tests in tests/silver/.
+# Purpose:
+#     Descriptions and generic data tests for the Silver models: primary keys,
+#     the keys used by the Gold joins, untrimmed text, and the domains of the
+#     decoded columns. The business rules of crm_sales_details are singular
+#     tests in tests/silver/.
 # =============================================================================
 
 models:
